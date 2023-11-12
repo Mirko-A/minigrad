@@ -6,7 +6,6 @@ class Value:
         if isinstance(other, Value):
             out = Value(self.val + other.val)
         else:
-            assert isinstance(other, float)
             out = Value(self.val + other)
         
         return out
@@ -15,16 +14,15 @@ class Value:
         if isinstance(other, Value):
             out = Value(self.val + other.val)
         else:
-            assert isinstance(other, float)
             out = Value(self.val + other)
         
         return out
     
     # TODO: ----------------------------------------
-    # multiplication
-    # exponentiation
-    # sigmoid
-    # relu
+    # multiplication - Mire
+    # exponentiation - Prki
+    # sigmoid - Mire
+    # relu - Prki
     # ----------------------------------------------
     
     
