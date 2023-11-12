@@ -7,9 +7,3 @@ class Value:
     
     def __repr__(self) -> str:
         return f"Value: {self.val}"
-    
-a = Value(3.0)
-b = Value(5.0)
-
-c = a + b
-print(c)
