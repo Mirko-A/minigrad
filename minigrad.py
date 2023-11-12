@@ -18,6 +18,22 @@ class Value:
         
         return out
     
+    def __mul__(self, other):
+        if isinstance(other, Value):
+            out = Value(self.val * other.val)
+        else:
+            out = Value(self.val * other)
+
+        return out
+    
+    def __rmul__(self, other):
+        if isinstance(other, Value):
+            out = Value(self.val * other.val)
+        else:
+            out = Value(self.val * other)
+
+        return out
+    
     def __pow__(self, other):
         if isinstance(other, Value):
             out = Value(self.val ** other.val)
@@ -29,13 +45,6 @@ class Value:
     def relu(self):
         out = Value(self.val if self.val > 0 else 0)
         return out
-    
-    # TODO: ----------------------------------------
-    # multiplication - Mire
-    # exponentiation - Prki ✔
-    # sigmoid - Mire 
-    # relu - Prki ✔
-    # ----------------------------------------------
     
     def __repr__(self) -> str:
         return f"Value: {self.val}"
