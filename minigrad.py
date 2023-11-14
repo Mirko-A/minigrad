@@ -1,43 +1,44 @@
 from __future__ import annotations
-from typing import Union
 
 import math
 
 class Value:
-    def __init__(self, data: float) -> None:
+    def __init__(self, data: float, _children=()) -> None:
         self._data = data
+        self._children = _children
         self.grad = 0.0
-        self.backward = lambda : None
+        self._backward = lambda : None
 
     @property
     def data(self) -> float:
         return self._data
 
-    # NOTE: Check if x, y can be omitted from functions below
     # NOTE: Should these functions be a class?
 
-    # TODO: Add children (participants in operation) to each operation - Prki
     # TODO: Add backward functions to everything - Split up
 
-    def _add(self, other: Union[Value, float], reverse=False) -> Value:
-        x = self
-        y = other if isinstance(other, Value) else Value(other)
+    def _add(self, other: Value | float, reverse=False) -> Value:
+        if not isinstance(other, Value): other = Value(other)
         
         if reverse:
-            x, y = y, x
+            self, other = other, self
 
-        out = Value(x.data + y.data)
+        out = Value(self.data + other.data, (self, other))
+        
+        def _backward():
+            self.grad += out.grad
+            other.grad += out.grad
+        out._backward = _backward
         
         return out
 
-    def _sub(self, other: Union[Value, float], reverse=False) -> Value:
-        x = self
-        y = other if isinstance(other, Value) else Value(other)
-        
-        if reverse:
-            x, y = y, x
+    def _sub(self, other: Value | float, reverse=False) -> Value:
+        if not isinstance(other, Value): other = Value(other)
 
-        out = Value(x.data - y.data)
+        if reverse:
+            self, other = other, self
+
+        out = Value(self.data - other.data, (self, other))
         
         return out
     
@@ -45,36 +46,33 @@ class Value:
         out = Value(-self.data)
         return out
     
-    def _mul(self, other: Union[Value, float], reverse=False) -> Value:
-        x = self
-        y = other if isinstance(other, Value) else Value(other)
+    def _mul(self, other: Value | float, reverse=False) -> Value:
+        if not isinstance(other, Value): other = Value(other)
         
         if reverse:
-            x, y = y, x
+            self, other = other, self
 
-        out = Value(x.data * y.data)
+        out = Value(self.data * other.data, (self, other))
         
         return out
     
-    def _div(self, other: Union[Value, float], reverse=False) -> Value:
-        x = self
-        y = other if isinstance(other, Value) else Value(other)
+    def _div(self, other: Value | float, reverse=False) -> Value:
+        if not isinstance(other, Value): other = Value(other)
         
         if reverse:
-            x, y = y, x
+            self, other = other, self
 
-        out = Value(x.data / y.data)
+        out = Value(self.data / other.data, (self, other))
         
         return out
 
-    def _pow(self, other: Union[Value, float], reverse=False) -> Value:
-        x = self
-        y = other if isinstance(other, Value) else Value(other)
+    def _pow(self, other: Value | float, reverse=False) -> Value:
+        if not isinstance(other, Value): other = Value(other)
         
         if reverse:
-            x, y = y, x
+            self, other = other, self
 
-        out = Value(x.data ** y.data)
+        out = Value(self.data ** other.data, (self, other))
         
         return out
 
@@ -96,15 +94,15 @@ class Value:
     def __rpow__(self, other): return self._pow(other, True)
     
     def exp(self):
-        out = Value(math.e ** self.data)
+        out = Value(math.e ** self.data, (self,))
         return out
 
     def sigmoid(self):
-        out = 1 / (1 + (-self).exp())
+        out = Value(1 / (1 + (-self).exp().data), (self,))
         return out
 
     def relu(self):
-        out = Value(self.data if self.data > 0 else 0)
+        out = Value(self.data if self.data > 0 else 0, (self,))
         return out
     
     def __repr__(self) -> str:
@@ -119,6 +117,7 @@ e = 10.0 + d
 f = 15.0 + e
 g = b ** a
 h = b ** 2
-i = a.relu()
-print(i.data)
-a = 3.0
+i = a.exp()
+j = a.sigmoid()
+k = a.relu()
+print(f'{i}\n{j}\n{k}')
