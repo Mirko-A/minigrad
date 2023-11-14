@@ -36,7 +36,7 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data - y.data, (self, other))
+        out = Value(x.data - y.data, (x, y))
         
         def _backward():
             self.grad += out.grad
@@ -67,7 +67,7 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data / y.data, (self, other))
+        out = Value(x.data / y.data, (x, y))
         
         return out
 
@@ -77,7 +77,7 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data ** y.data, (self, other))
+        out = Value(x.data ** y.data, (x, y))
         
         return out
 
