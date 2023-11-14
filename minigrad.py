@@ -16,12 +16,10 @@ class Value:
     # NOTE: Should these functions be a class?
 
     # TODO: Add backward functions to everything - Split up
+    # TODO: Test if backward works for reverse functions
 
-    def _add(self, other: Value | float, reverse=False) -> Value:
+    def _add(self, other: Value | float) -> Value:
         if not isinstance(other, Value): other = Value(other)
-        
-        if reverse:
-            self, other = other, self
 
         out = Value(self.data + other.data, (self, other))
         
@@ -31,14 +29,19 @@ class Value:
         out._backward = _backward
         
         return out
-
+    
     def _sub(self, other: Value | float, reverse=False) -> Value:
-        if not isinstance(other, Value): other = Value(other)
-
+        x, y = self, other if isinstance(other, Value) else Value(other)
+        
         if reverse:
-            self, other = other, self
+            x, y = y, x
 
-        out = Value(self.data - other.data, (self, other))
+        out = Value(x.data - y.data)
+        
+        def _backward():
+            self.grad += out.grad
+            other.grad -= out.grad
+        out._backward = _backward
         
         return out
     
@@ -46,38 +49,40 @@ class Value:
         out = Value(-self.data)
         return out
     
-    def _mul(self, other: Value | float, reverse=False) -> Value:
+    def _mul(self, other: Value | float) -> Value:
         if not isinstance(other, Value): other = Value(other)
-        
-        if reverse:
-            self, other = other, self
 
         out = Value(self.data * other.data, (self, other))
+        
+        def _backward():
+            self.grad += other.grad * out.grad
+            other.grad += self.grad * out.grad
+        out._backward = _backward
         
         return out
     
     def _div(self, other: Value | float, reverse=False) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+        x, y = self, other if isinstance(other, Value) else Value(other)
         
         if reverse:
-            self, other = other, self
+            x, y = y, x
 
-        out = Value(self.data / other.data, (self, other))
+        out = Value(x.data / y.data)
         
         return out
 
     def _pow(self, other: Value | float, reverse=False) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+        x, y = self, other if isinstance(other, Value) else Value(other)
         
         if reverse:
-            self, other = other, self
+            x, y = y, x
 
-        out = Value(self.data ** other.data, (self, other))
+        out = Value(x.data ** y.data)
         
         return out
 
     def __add__(self, other): return self._add(other)
-    def __radd__(self, other): return self._add(other, True)
+    def __radd__(self, other): return self._add(other)
     
     def __sub__(self, other): return self._sub(other)
     def __rsub__(self, other): return self._sub(other, True)
@@ -85,7 +90,7 @@ class Value:
     def __neg__(self): return self._neg()
 
     def __mul__(self, other): return self._mul(other)
-    def __rmul__(self, other): return self._mul(other, True)
+    def __rmul__(self, other): return self._mul(other)
     
     def __truediv__(self, other): return self._div(other)
     def __rtruediv__(self, other): return self._div(other, True)
