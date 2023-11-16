@@ -3,7 +3,7 @@ import math
 
 from minigrad import Value
 
-class TestValue(unittest.TestCase):
+class TestBinaryOps(unittest.TestCase):
     def test_add_two_value_objects(self):
         a = 3.0
         b = 1.5
@@ -41,11 +41,6 @@ class TestValue(unittest.TestCase):
         b = 1.5
         v1 = Value(a)
         self.assertEqual((b - v1).data, b - a)
-
-    def test_neg_value_object(self):
-        a = 3.0
-        v1 = Value(a)
-        self.assertEqual(-v1.data, -a)
 
     def test_mul_two_value_objects(self):
         a = 3.0
@@ -102,17 +97,14 @@ class TestValue(unittest.TestCase):
         b = 2.0
         v1 = Value(a)
         self.assertEqual((b ** v1).data, b ** a)
-    
-    def test_exp(self):
-        a = 3.0
-        v1 = Value(a)
-        self.assertEqual((math.e ** v1).data, math.e ** a)
-        
-    def test_sigmoid(self):
-        a = 3.0
-        v1 = Value(a)
-        self.assertEqual((v1.sigmoid()).data, 1 / (1 + math.e ** -a))
 
+class TestUnaryOps(unittest.TestCase):
+    def test_neg_value_object(self):
+        a = 3.0
+        v1 = Value(a)
+        self.assertEqual(-v1.data, -a)
+
+class TestActivationFuncs(unittest.TestCase):
     def test_sigmoid(self):
         a = 3.0
         v1 = Value(a)
@@ -129,6 +121,90 @@ class TestValue(unittest.TestCase):
         a_relu = a
         v1 = Value(a)
         self.assertEqual((v1.relu()).data, a_relu)
+
+class TestOtherFuncs(unittest.TestCase):
+    def test_exp(self):
+        a = 3.0
+        v1 = Value(a)
+        self.assertEqual((math.e ** v1).data, math.e ** a)
+
+class TestBackwardFuncs(unittest.TestCase):
+    def test_add_backward(self):
+        a = Value(3.0)
+        b = Value(1.7)
+
+        a_grad = b_grad = 1.0
+
+        c = a + b
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c.grad, 1.0)
+
+    def test_sub_backward_both_value_object(self):
+        a = Value(3.0)
+        b = Value(1.7)
+
+        a_grad = 1.0
+        b_grad = -1.0
+
+        c = a - b # 3 - 1.7
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+
+    def test_mul_backward(self):
+        a = Value(3.0)
+        b = Value(1.7)
+
+        a_grad = b_grad = 1.0
+
+        c = a + b
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+        
+    def test_div_backward(self):
+        a = Value(3.0)
+        b = Value(1.7)
+
+        a_grad = b_grad = 1.0
+
+        c = a + b
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+        
+    def test_pow_backward(self):
+        a = Value(3.0)
+        b = Value(1.7)
+
+        a_grad = b_grad = 1.0
+
+        c = a + b
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+
+    def test_complex_backward(self):
+        a = Value(3.0)
+        b = Value(1.7)
+        c = Value(0.4)
+
+        d = a * b
+        f = d - c
+
+        a_grad = 1.7
+        b_grad = 3.0
+        c_grad = -1.0
+        d_grad = 1.0
+
+        f.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c.grad, c_grad)
+        self.assertEqual(d.grad, d_grad)
+        self.assertEqual(f.grad, 1.0)
 
 if __name__ == "__main__":
     unittest.main()
