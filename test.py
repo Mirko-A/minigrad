@@ -108,7 +108,7 @@ class TestActivationFuncs(unittest.TestCase):
     def test_sigmoid(self):
         a = 3.0
         v1 = Value(a)
-        self.assertEqual((v1.sigmoid()).data, 1 / (1 + math.e ** -a))
+        self.assertEqual((v1.sigmoid()).data, 1 / (1 + math.exp(-a)))
 
     def test_relu_below_zero(self):
         a = -3.0
@@ -121,6 +121,11 @@ class TestActivationFuncs(unittest.TestCase):
         a_relu = a
         v1 = Value(a)
         self.assertEqual((v1.relu()).data, a_relu)
+        
+    def test_tanh(self):
+        a = 3.0
+        v1 = Value(a)
+        self.assertEqual((v1.tanh()).data, (math.exp(2*a) - 1) / (math.exp(2*a) + 1))
 
 class TestOtherFuncs(unittest.TestCase):
     def test_exp(self):
@@ -148,18 +153,43 @@ class TestBackwardFuncs(unittest.TestCase):
         a_grad = 1.0
         b_grad = -1.0
 
-        c = a - b # 3 - 1.7
+        c = a - b
         c.backward()
         self.assertEqual(a.grad, a_grad)
+        self.assertEqual(b.grad, b_grad)
+        
+    def test_sub_backward_first_place_value_object(self):
+        a = Value(3.0)
+        b = 1.7
+
+        a_grad = 1.0
+        b_grad = -1.0
+
+        c = a - b
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
+        
+    def test_sub_backward_second_place_value_object(self):
+        a = 3.0
+        b = Value(1.7)
+
+        a_grad = 1.0
+        b_grad = -1.0
+
+        c = a - b
+        c.backward()
+        self.assertEqual(c._children[1].grad, a_grad)
         self.assertEqual(b.grad, b_grad)
 
     def test_mul_backward(self):
         a = Value(3.0)
         b = Value(1.7)
 
-        a_grad = b_grad = 1.0
+        a_grad = 1.7
+        b_grad = 3.0
 
-        c = a + b
+        c = a * b
         c.backward()
         self.assertEqual(a.grad, a_grad)
         self.assertEqual(b.grad, b_grad)
@@ -185,6 +215,34 @@ class TestBackwardFuncs(unittest.TestCase):
         c.backward()
         self.assertEqual(a.grad, a_grad)
         self.assertEqual(b.grad, b_grad)
+        
+    def test_relu_backward_below_zero(self):
+        a = Value(-3.0)
+        
+        a_grad = 0
+        
+        c = a.relu()
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        
+        
+    def test_relu_backward_above_zero(self):
+        a = Value(3.0)
+        
+        a_grad = 1
+        
+        c = a.relu()
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
+        
+    def test_tanh_backward(self):
+        a = Value(3.0)
+        
+        a_grad = 1 - ((math.exp(2*a.data) - 1) / (math.exp(2*a.data) + 1)) ** 2
+        
+        c = a.tanh()
+        c.backward()
+        self.assertEqual(a.grad, a_grad)
 
     def test_complex_backward(self):
         a = Value(3.0)

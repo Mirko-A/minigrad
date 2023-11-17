@@ -142,7 +142,7 @@ class Value:
     # ----------------- Activation funcs -----------------
     def sigmoid(self):
         def sigmoid_impl(x):
-            return 1 / (1 + math.e ** (-x))
+            return 1 / (1 + math.exp(-x))
         
         out = Value(sigmoid_impl(self.data), (self,))
 
@@ -164,6 +164,19 @@ class Value:
 
         return out
 
+    def tanh(self):
+        def tanh_impl(x):
+            return (math.exp(2*x) - 1) / (math.exp(2*x) + 1)
+        
+        out = Value(tanh_impl(self.data), (self,))
+        
+        def _backward():
+            self.grad += out.grad * (1 - tanh_impl(self.data) ** 2)
+        
+        out._backward = _backward
+        
+        return out
+        
     # ---------------- Backpropagation ----------------
     def backward(self) -> None:
         self.grad = 1.0
