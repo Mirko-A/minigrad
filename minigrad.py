@@ -1,16 +1,21 @@
 from __future__ import annotations
-from typing import List
+from typing import List, Tuple
 
 import math
 
 # TODO: Add the rest of tests for Value class (take into account non comutative functions)
 #       1) Prki:  Sub, mul, relu, tanh
 #       2) Mire:  add, div, pow, sigmoid
-#       
+
 # TODO: Begin Tensor class
 
+# NOTE: Children of a Value which is created as a result of commutative operations
+#       might be swapped if it is called from r-operation. Potentailly the reverse
+#       flag might be needed for those operations just to keep the children always
+#       in the same order.
+
 class Value:
-    def __init__(self, data: float, _children: tuple=()) -> None:
+    def __init__(self, data: float, _children: tuple[Value, Value]=()) -> None:
         self.grad = 0.0
         self._data = data
         self._children = _children
@@ -29,6 +34,7 @@ class Value:
         def _backward():
             self.grad  += out.grad
             other.grad += out.grad
+
         out._backward = _backward
         
         return out
@@ -40,15 +46,11 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data - y.data, (self, other))
+        out = Value(x.data - y.data, (x, y))
 
         def _backward():
-            if reverse:
-                self.grad  += -out.grad
-                other.grad +=  out.grad
-            else:
-                self.grad  +=  out.grad
-                other.grad += -out.grad
+            x.grad +=  out.grad
+            y.grad += -out.grad
 
         out._backward = _backward
         
@@ -59,6 +61,7 @@ class Value:
         
         def _backward():
             self.grad += -out.grad
+
         out._backward = _backward
 
         return out
@@ -71,6 +74,7 @@ class Value:
         def _backward():
             self.grad  += out.grad * other.data
             other.grad += out.grad * self.data
+
         out._backward = _backward
         
         return out
@@ -82,17 +86,11 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data / y.data, (self, other))
+        out = Value(x.data / y.data, (x, y))
 
         def _backward():
-            if reverse:
-                # (other / self)
-                self.grad  += out.grad * other.data
-                other.grad += out.grad * 1 / self.data
-            else:
-                # (self / other)
-                self.grad  += out.grad * 1 / other.data
-                other.grad += out.grad * self.data
+            x.grad += out.grad * 1 / y.data
+            y.grad += out.grad * (-1)*(x.data / (y.data ** 2))
 
         out._backward = _backward
 
@@ -108,14 +106,8 @@ class Value:
         out = Value(x.data ** y.data, (self, other))
         
         def _backward():
-            if reverse:
-                # (other ** self)
-                self.grad  += out.grad * ((other.data ** self.data) * math.log(self.data))
-                other.grad += out.grad * (self.data * (other.data ** (self.data - 1)))
-            else:
-                # (self ** other)
-                self.grad  += out.grad * (other.data * (self.data ** (other.data - 1)))
-                other.grad += out.grad * ((self.data ** other.data) * math.log(other.data))
+            x.grad += out.grad * (y.data * (x.data ** (y.data - 1)))
+            y.grad += out.grad * ((x.data ** y.data) * math.log(y.data))
 
         out._backward = _backward
 
