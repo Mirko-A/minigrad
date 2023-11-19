@@ -142,8 +142,8 @@ class TestBackwardFuncs(unittest.TestCase):
 
         c = a + b
         c.backward()
-        self.assertEqual(a.grad, a_grad)
-        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
         self.assertEqual(c.grad, 1.0)
 
     def test_sub_backward_both_value_object(self):
@@ -155,8 +155,8 @@ class TestBackwardFuncs(unittest.TestCase):
 
         c = a - b
         c.backward()
-        self.assertEqual(a.grad, a_grad)
-        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
         
     def test_sub_backward_first_place_value_object(self):
         a = Value(3.0)
@@ -167,7 +167,7 @@ class TestBackwardFuncs(unittest.TestCase):
 
         c = a - b
         c.backward()
-        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
         self.assertEqual(c._children[1].grad, b_grad)
         
     def test_sub_backward_second_place_value_object(self):
@@ -179,8 +179,8 @@ class TestBackwardFuncs(unittest.TestCase):
 
         c = a - b
         c.backward()
-        self.assertEqual(c._children[1].grad, a_grad)
-        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
 
     def test_mul_backward(self):
         a = Value(3.0)
@@ -191,31 +191,94 @@ class TestBackwardFuncs(unittest.TestCase):
 
         c = a * b
         c.backward()
-        self.assertEqual(a.grad, a_grad)
-        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
         
-    def test_div_backward(self):
+    def test_div_backward_value_object_and_scalar(self):
+        a = Value(3.0)
+        b = 1.7
+
+        a_grad = 1/1.7
+        b_grad = -(3.0 / (1.7 ** 2)) 
+
+        c = a / b
+        c.backward()
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
+
+    def test_div_backward_scalar_and_value_object(self):
+        a = 3.0
+        b = Value(1.7)
+
+        a_grad = 1/1.7
+        b_grad = -(3.0 / (1.7 ** 2)) 
+
+        c = a / b
+        c.backward()
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
+
+    def test_div_backward_two_value_objects(self):
         a = Value(3.0)
         b = Value(1.7)
 
-        a_grad = b_grad = 1.0
+        a_grad = 1/1.7
+        b_grad = -(3.0 / (1.7 ** 2)) 
 
-        c = a + b
+        c = a / b
         c.backward()
-        self.assertEqual(a.grad, a_grad)
-        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
+
+    def test_pow_backward_value_object_and_scalar(self):
+        a = Value(3.0)
+        b = 1.7
+
+        a_grad = b * (a.data ** (b - 1))
+        b_grad = (a.data ** b) * math.log(b)
+
+        c = a ** b
+        c.backward()
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
+
+    def test_pow_backward_scalar_and_value_object(self):
+        a = 3.0
+        b = Value(1.7)
+
+        a_grad = b.data * (a ** (b.data - 1))
+        b_grad = (a ** b.data) * math.log(b.data)
+
+        c = a ** b
+        c.backward()
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
         
-    def test_pow_backward(self):
+    def test_pow_backward_two_value_objects(self):
         a = Value(3.0)
         b = Value(1.7)
 
-        a_grad = b_grad = 1.0
+        a_grad = b.data * (a.data ** (b.data - 1))
+        b_grad = (a.data ** b.data) * math.log(b.data)
 
-        c = a + b
+        c = a ** b
         c.backward()
-        self.assertEqual(a.grad, a_grad)
-        self.assertEqual(b.grad, b_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
+        self.assertEqual(c._children[1].grad, b_grad)
+
+    def test_sigmoid_backward(self):
+        a = Value(2.7)
+
+        def sigmoid_impl(x):
+            return 1 / (1 + math.exp(-x))
+
+        a_grad = sigmoid_impl(a.data) * (1 - sigmoid_impl(a.data))
+
+        c = a.sigmoid()
+        c.backward()
         
+        self.assertEqual(c._children[0].grad, a_grad)
+
     def test_relu_backward_below_zero(self):
         a = Value(-3.0)
         
@@ -223,8 +286,7 @@ class TestBackwardFuncs(unittest.TestCase):
         
         c = a.relu()
         c.backward()
-        self.assertEqual(a.grad, a_grad)
-        
+        self.assertEqual(c._children[0].grad, a_grad)
         
     def test_relu_backward_above_zero(self):
         a = Value(3.0)
@@ -233,7 +295,7 @@ class TestBackwardFuncs(unittest.TestCase):
         
         c = a.relu()
         c.backward()
-        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
         
     def test_tanh_backward(self):
         a = Value(3.0)
@@ -242,7 +304,7 @@ class TestBackwardFuncs(unittest.TestCase):
         
         c = a.tanh()
         c.backward()
-        self.assertEqual(a.grad, a_grad)
+        self.assertEqual(c._children[0].grad, a_grad)
 
     def test_complex_backward(self):
         a = Value(3.0)

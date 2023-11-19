@@ -3,10 +3,6 @@ from typing import List, Tuple
 
 import math
 
-# TODO: Add the rest of tests for Value class (take into account non comutative functions)
-#       1) Prki:  Sub, mul, relu, tanh
-#       2) Mire:  add, div, pow, sigmoid
-
 # TODO: Begin Tensor class
 
 # NOTE: Children of a Value which is created as a result of commutative operations
