@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 import math
 
-import torch
+#import torch
 
 # TODO: Begin Tensor class
 
@@ -197,25 +197,30 @@ class Value:
 a = Value(0.31)
 b = Value(1.5)
 
-a_t = torch.Tensor([0.31]); a_t.requires_grad = True
-b_t = torch.Tensor([1.5]); b_t.requires_grad = True
+#a_t = torch.Tensor([0.31]); a_t.requires_grad = True
+#b_t = torch.Tensor([1.5]); b_t.requires_grad = True
 
 f = ((a*0.7 + b) ** 2.0) / 1.7
 f = f.tanh()
 print(f)
 
-f_t = ((a_t*0.7 + b_t) ** 2.0) / 1.7
-f_t = f_t.tanh()
-print(f_t)
+#f_t = ((a_t*0.7 + b_t) ** 2.0) / 1.7
+#f_t = f_t.tanh()
+#print(f_t)
 
 f.backward()
-f_t.backward()
+#f_t.backward()
 
 grads_txt = f"""
 a:{a.grad}
-a_t:{a_t.grad.item()}
 b:{b.grad}
-b_t:{b_t.grad.item()}
 """
+
+#grads_txt = f"""
+#a:{a.grad}
+#a_t:{a_t.grad.item()}
+#b:{b.grad}
+#b_t:{b_t.grad.item()}
+#"""
 
 print(grads_txt)
