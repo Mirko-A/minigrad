@@ -5,8 +5,6 @@ import math
 
 #import torch
 
-# TODO: Begin Tensor class
-
 # NOTE: Children of a Value which is created as a result of commutative operations
 #       might be swapped if it is called from r-operation. Potentailly the reverse
 #       flag might be needed for those operations just to keep the children always
@@ -192,11 +190,80 @@ class Value:
         return Value(math.exp(self.data))
 
     def __repr__(self) -> str:
-        return f"Value: {self.data}"
+        return f"{self.data}"
+
+class Matrix:
+    def __init__(self, data: float | List[float] | List[List[float]]) -> None:
+        self.empty_list_error_message = "Cannot construct Matrix from empty list."
+        self.row_len_error_message = "All rows must have the same length."
+        self.type_error_message = "Cannot construct Matrix with given arguments. Expected: float, list of floats or list of lists of floats."
+        
+        if isinstance(data, float):
+            self.data = self._create_data_from_float(data)
+        elif isinstance(data, list) and all(isinstance(x, float) for x in data):
+            self.data = self._create_data_from_list_1d(data)
+        elif isinstance(data, list) and all(isinstance(row, list) and all(isinstance(x, float) for x in row) for row in data):
+            self.data = self._create_data_from_list_2d(data)
+        else:
+            raise TypeError(self.type_error_message)
+
+    def _create_data_from_float(self, data: float) -> List[List[Value]]:
+        return [[Value(data)]]
+    
+    def _create_data_from_list_1d(self, data: List[float]) -> List[List[Value]]:
+        if not data: 
+            raise ValueError(self.empty_list_error_message)
+        
+        for index, value in enumerate(data):
+            data[index] = Value(value)
+
+        return [data]
+
+    def _create_data_from_list_2d(self, data: List[List[float]]) -> List[List[Value]]:
+        if not all(row for row in data):
+            raise ValueError(self.empty_list_error_message)
+        elif not all(len(row) == len(data[0]) for row in data):
+            raise ValueError(self.row_len_error_message)            
+
+        for row in data:
+            for index, value in enumerate(row):
+                row[index] = Value(value)
+            
+        return data
+    
+    # -------------------- Utility --------------------
+    def __repr__(self) -> str:
+        repr = str("Matrix([")
+
+        for row in self.data:
+            if not row == self.data[0]:
+                repr += "        ["
+            else:
+                repr += "["
+            
+            for value in row:
+                if not value == row[-1]:
+                    repr += f"{value}, "
+                else:
+                    repr += f"{value}"
+
+            if not row == self.data[-1]:
+                repr += "],\n"
+            else:
+                repr += "]"
+
+        repr += "])"
+
+        return repr
+    
+m = Matrix([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]])
+print(m)
 
 a = Value(0.31)
 b = Value(1.5)
 
+#t = torch.tensor([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]])
+#print(t)
 #a_t = torch.Tensor([0.31]); a_t.requires_grad = True
 #b_t = torch.Tensor([1.5]); b_t.requires_grad = True
 
