@@ -3,6 +3,8 @@ from typing import List, Tuple
 
 import math
 
+import torch
+
 # TODO: Begin Tensor class
 
 # NOTE: Children of a Value which is created as a result of commutative operations
@@ -11,7 +13,7 @@ import math
 #       in the same order.
 
 class Value:
-    def __init__(self, data: float, _children: tuple[Value, Value]=()) -> None:
+    def __init__(self, data: float, _children: Tuple[Value, Value]=()) -> None:
         self.grad = 0.0
         self._data = data
         self._children = _children
@@ -148,7 +150,7 @@ class Value:
             relu_deriv = 1 if self.data > 0 else 0
             self.grad += out.grad * relu_deriv
 
-        self._backward = _backward
+        out._backward = _backward
 
         return out
 
@@ -186,23 +188,34 @@ class Value:
             node._backward()
 
     # -------------------- Utility --------------------
-    def exp(self) -> float:
-        return self ** math.e
+    def exp(self) -> Value:
+        return Value(math.exp(self.data))
 
     def __repr__(self) -> str:
         return f"Value: {self.data}"
-    
+
 a = Value(0.31)
 b = Value(1.5)
 
-c = a + b
-d = c * 0.9
-e = 2.6 + d
-f = 0.15 + e
-g = b ** f
-h = g ** 0.62
-h._backward()
-i = a.exp()
-j = a.sigmoid()
-k = a.relu()
-print(f'{i}\n{j}\n{k}')
+a_t = torch.Tensor([0.31]); a_t.requires_grad = True
+b_t = torch.Tensor([1.5]); b_t.requires_grad = True
+
+f = ((a*0.7 + b) ** 2.0) / 1.7
+f = f.tanh()
+print(f)
+
+f_t = ((a_t*0.7 + b_t) ** 2.0) / 1.7
+f_t = f_t.tanh()
+print(f_t)
+
+f.backward()
+f_t.backward()
+
+grads_txt = f"""
+a:{a.grad}
+a_t:{a_t.grad.item()}
+b:{b.grad}
+b_t:{b_t.grad.item()}
+"""
+
+print(grads_txt)
