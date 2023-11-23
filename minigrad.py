@@ -195,8 +195,18 @@ class Value:
         return f"Value({self.data})"
 
 class Matrix:
+    class Shape:
+        def __init__(self, row: int, col: int) -> None:
+            assert row > 0 and col > 0, "Row and column must be natural numbers."
+            self.row = row
+            self.col = col
+        
+        def __eq__(self, __value: Matrix.Shape) -> bool:
+            return self.row == __value.row and self.col == __value.col
+            
     _empty_list_error_message = "Cannot construct Matrix from empty list."
     _row_len_error_message = "Cannot construct Matrix. All rows must have the same length."
+    # TODO: Update this error message based on whether scalar, 1d or 2d array was used.
     _type_error_message = "Cannot construct Matrix with given arguments. Expected: float, list of floats or list of lists of floats."
     
     # NOTE: Mirko A. (11/23/2023) 
@@ -206,10 +216,10 @@ class Matrix:
     # 2) from_1d_array(List[float])
     # 3) from_2d_array(List[List[float]])
     def __init__(self, data: List[List[Value]]) -> None:
+        assert all((isinstance(x, Value) for x in row) for row in data), "Cannot construct Matrix. Must pass a 2D list of Value objects."
         self.data = data
-        self.rows = len(data)
-        self.cols = len(data[0])
-
+        self._shape = Matrix.Shape(len(data), len(data[0]))
+        
     @staticmethod
     def from_scalar(data: float) -> Matrix:
         if not isinstance(data, float):
@@ -256,22 +266,31 @@ class Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
         assert self.dims_match_with(other), "Cannot add Matrices if size doesn't match."
 
-        out_shape = self.shape()
+        rows, cols = self.shape.row, self.shape.col
         
         out_data = []
         #= Matrix.zeros(rows, cols)
         
-        for row in range(out_shape[0]):
+        for row in range(rows):
             out_row = []
-            for col in range(out_shape[1]):
+            for col in range(cols):
                 out_row.append(self.data[row][col] + other.data[row][col])
             out_data.append(out_row)
 
         return Matrix(out_data)
     
     def T(self) -> Matrix:
-        pass
+        rows, cols = self.shape.row, self.shape.col
+        out_data = []
 
+        for col_idx in range(cols):
+            out_row = []
+            for row_idx in range(rows):
+                out_row.append(self.data[row_idx][col_idx])
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+    
     # ------------------ Dunder ops ------------------
 
     def __add__(self, other):
@@ -282,11 +301,12 @@ class Matrix:
 
     # -------------------- Utility --------------------
     
-    def shape(self) -> Tuple[int, int]:
-        return (self.rows, self.cols)
+    @property
+    def shape(self) -> Shape:
+        return self._shape
     
     def dims_match_with(self, other: Matrix) -> bool:
-        return self.shape() == other.shape()
+        return self.shape == other.shape
 
     def __repr__(self) -> str:
         repr = str("Matrix([")
@@ -331,8 +351,10 @@ class Matrix:
 m = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
 n = Matrix.from_2d_array([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
 y = Matrix.randn(2, 3)
+y_t = y.T()
 print(m + n)
 print(y)
+print(y_t)
 
 a = Value(0.31)
 b = Value(1.5)
