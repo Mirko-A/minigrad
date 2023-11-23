@@ -236,10 +236,9 @@ class Matrix:
             
         return data
     
-    def shape(self) -> Tuple[int, int]:
-        return (self.rows, self.cols)
+    # ------------------ Operators ------------------
 
-    def __add__(self, other):
+    def add(self, other) -> Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
         assert self.dims_match_with(other), "Cannot add Matrices if size doesn't match."
 
@@ -252,8 +251,23 @@ class Matrix:
                 out.data[i][j] = self.data[i][j] + other.data[i][j]
 
         return out
+    
+    def T(self) -> Matrix:
+        pass
+
+    # ------------------ Dunder ops ------------------
+
+    def __add__(self, other):
+        return self.add(other)
+    
+    def __radd__(self, other):
+        return self.add(other)
 
     # -------------------- Utility --------------------
+    
+    def shape(self) -> Tuple[int, int]:
+        return (self.rows, self.cols)
+    
     def dims_match_with(self, other: Matrix) -> bool:
         return self.shape() == other.shape()
 
