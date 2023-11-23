@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import List, Tuple
 
+from random import gauss
+
 import math
 
 #import torch
@@ -190,7 +192,7 @@ class Value:
         return Value(math.exp(self.data))
 
     def __repr__(self) -> str:
-        return f"{self.data}"
+        return f"Value({self.data})"
 
 class Matrix:
     def __init__(self, data: float | List[float] | List[List[float]]) -> None:
@@ -206,6 +208,9 @@ class Matrix:
             self.data = self._create_data_from_list_2d(data)
         else:
             raise TypeError(self.type_error_message)
+
+        self.rows = len(self.data)
+        self.cols = len(self.data[0])
 
     def _create_data_from_float(self, data: float) -> List[List[Value]]:
         return [[Value(data)]]
@@ -231,7 +236,27 @@ class Matrix:
             
         return data
     
+    def shape(self) -> Tuple[int, int]:
+        return (self.rows, self.cols)
+
+    def __add__(self, other):
+        assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
+        assert self.dims_match_with(other), "Cannot add Matrices if size doesn't match."
+
+        rows, cols = self.shape()[0], self.shape()[1]
+        
+        out = Matrix.zeros(rows, cols)
+        
+        for i in range(rows):
+            for j in range(cols):
+                out.data[i][j] = self.data[i][j] + other.data[i][j]
+
+        return out
+
     # -------------------- Utility --------------------
+    def dims_match_with(self, other: Matrix) -> bool:
+        return self.shape() == other.shape()
+
     def __repr__(self) -> str:
         repr = str("Matrix([")
 
@@ -242,10 +267,15 @@ class Matrix:
                 repr += "["
             
             for value in row:
+                value_str = f"{value.data:.4f}"
+                if value.data > 0:
+                    # Indent to align with '-' character of negative numbers
+                    value_str = " " + value_str
+                    
                 if not value == row[-1]:
-                    repr += f"{value}, "
+                    repr += value_str + ", "
                 else:
-                    repr += f"{value}"
+                    repr += value_str
 
             if not row == self.data[-1]:
                 repr += "],\n"
@@ -256,8 +286,22 @@ class Matrix:
 
         return repr
     
-m = Matrix([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]])
-print(m)
+    # ----------------- Static methods ------------------
+
+    @staticmethod
+    def zeros(rows: int, cols: int) -> Matrix:
+        return Matrix([ [0.0] * cols for _ in range(rows)])
+
+    @staticmethod
+    def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
+        data = [[gauss(mean, std_dev) for _ in range(rows)] for _ in range(cols)]
+        return Matrix(data)
+
+m = Matrix([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
+n = Matrix([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
+y = Matrix.randn(2, 3)
+print(m + n)
+print(y)
 
 a = Value(0.31)
 b = Value(1.5)
