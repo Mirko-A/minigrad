@@ -195,62 +195,79 @@ class Value:
         return f"Value({self.data})"
 
 class Matrix:
-    def __init__(self, data: float | List[float] | List[List[float]]) -> None:
-        self.empty_list_error_message = "Cannot construct Matrix from empty list."
-        self.row_len_error_message = "All rows must have the same length."
-        self.type_error_message = "Cannot construct Matrix with given arguments. Expected: float, list of floats or list of lists of floats."
-        
-        if isinstance(data, float):
-            self.data = self._create_data_from_float(data)
-        elif isinstance(data, list) and all(isinstance(x, float) for x in data):
-            self.data = self._create_data_from_list_1d(data)
-        elif isinstance(data, list) and all(isinstance(row, list) and all(isinstance(x, float) for x in row) for row in data):
-            self.data = self._create_data_from_list_2d(data)
-        else:
-            raise TypeError(self.type_error_message)
-
-        self.rows = len(self.data)
-        self.cols = len(self.data[0])
-
-    def _create_data_from_float(self, data: float) -> List[List[Value]]:
-        return [[Value(data)]]
+    _empty_list_error_message = "Cannot construct Matrix from empty list."
+    _row_len_error_message = "Cannot construct Matrix. All rows must have the same length."
+    _type_error_message = "Cannot construct Matrix with given arguments. Expected: float, list of floats or list of lists of floats."
     
-    def _create_data_from_list_1d(self, data: List[float]) -> List[List[Value]]:
-        if not data: 
-            raise ValueError(self.empty_list_error_message)
+    # NOTE: Mirko A. (11/23/2023) 
+    # Please do not use the constructor directly outside of the Matrix class.
+    # Matrix can be constructed through the following static methods:
+    # 1) from_scalar(float)
+    # 2) from_1d_array(List[float])
+    # 3) from_2d_array(List[List[float]])
+    def __init__(self, data: List[List[Value]]) -> None:
+        self.data = data
+        self.rows = len(data)
+        self.cols = len(data[0])
+
+    @staticmethod
+    def from_scalar(data: float) -> Matrix:
+        if not isinstance(data, float):
+            raise TypeError(Matrix._type_error_message)
         
-        for index, value in enumerate(data):
-            data[index] = Value(value)
+        return Matrix([[Value(data)]])
+    
+    @staticmethod
+    def from_1d_array(data: List[float]) -> Matrix:
+        if not data: 
+            raise ValueError(Matrix._empty_list_error_message)
+        if not all(isinstance(float, x) for x in data):
+            raise TypeError(Matrix._type_error_message)
+        
+        _data = []
 
-        return [data]
+        for x in data:
+            _data.append(Value(x))
 
-    def _create_data_from_list_2d(self, data: List[List[float]]) -> List[List[Value]]:
+        return Matrix([_data])
+    
+    @staticmethod
+    def from_2d_array(data: float) -> Matrix:
         if not all(row for row in data):
-            raise ValueError(self.empty_list_error_message)
+            raise ValueError(Matrix._empty_list_error_message)
         elif not all(len(row) == len(data[0]) for row in data):
-            raise ValueError(self.row_len_error_message)            
+            raise ValueError(Matrix._row_len_error_message)
+        elif not all((isinstance(x, float) for x in row) for row in data):
+            raise TypeError(Matrix._type_error_message)
+        
+        _data = []
 
         for row in data:
-            for index, value in enumerate(row):
-                row[index] = Value(value)
-            
-        return data
+            _row = []
+            for x in row:
+                _row.append(Value(x))
+            _data.append(_row)
+
+        return Matrix(_data)
     
     # ------------------ Operators ------------------
 
-    def add(self, other) -> Matrix:
+    def add(self, other: Matrix) -> Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
         assert self.dims_match_with(other), "Cannot add Matrices if size doesn't match."
 
-        rows, cols = self.shape()[0], self.shape()[1]
+        out_shape = self.shape()
         
-        out = Matrix.zeros(rows, cols)
+        out_data = []
+        #= Matrix.zeros(rows, cols)
         
-        for i in range(rows):
-            for j in range(cols):
-                out.data[i][j] = self.data[i][j] + other.data[i][j]
+        for row in range(out_shape[0]):
+            out_row = []
+            for col in range(out_shape[1]):
+                out_row.append(self.data[row][col] + other.data[row][col])
+            out_data.append(out_row)
 
-        return out
+        return Matrix(out_data)
     
     def T(self) -> Matrix:
         pass
@@ -304,15 +321,15 @@ class Matrix:
 
     @staticmethod
     def zeros(rows: int, cols: int) -> Matrix:
-        return Matrix([ [0.0] * cols for _ in range(rows)])
+        return Matrix.from_2d_array([ [0.0] * cols for _ in range(rows)])
 
     @staticmethod
     def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
         data = [[gauss(mean, std_dev) for _ in range(rows)] for _ in range(cols)]
-        return Matrix(data)
+        return Matrix.from_2d_array(data)
 
-m = Matrix([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
-n = Matrix([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
+m = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
+n = Matrix.from_2d_array([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
 y = Matrix.randn(2, 3)
 print(m + n)
 print(y)
