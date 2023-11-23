@@ -207,7 +207,7 @@ class Matrix:
     _empty_list_error_message = "Cannot construct Matrix from empty list."
     _row_len_error_message = "Cannot construct Matrix. All rows must have the same length."
     # TODO: Update this error message based on whether scalar, 1d or 2d array was used.
-    _type_error_message = "Cannot construct Matrix with given arguments. Expected: float, list of floats or list of lists of floats."
+    _type_error_message = "Cannot construct Matrix with given arguments. Expected: "
     
     # NOTE: Mirko A. (11/23/2023) 
     # Please do not use the constructor directly outside of the Matrix class.
@@ -223,7 +223,7 @@ class Matrix:
     @staticmethod
     def from_scalar(data: float) -> Matrix:
         if not isinstance(data, float):
-            raise TypeError(Matrix._type_error_message)
+            raise TypeError(Matrix._type_error_message + "scalar (float).")
         
         return Matrix([[Value(data)]])
     
@@ -232,7 +232,7 @@ class Matrix:
         if not data: 
             raise ValueError(Matrix._empty_list_error_message)
         if not all(isinstance(float, x) for x in data):
-            raise TypeError(Matrix._type_error_message)
+            raise TypeError(Matrix._type_error_message + "1D array (float).")
         
         _data = []
 
@@ -242,13 +242,13 @@ class Matrix:
         return Matrix([_data])
     
     @staticmethod
-    def from_2d_array(data: float) -> Matrix:
+    def from_2d_array(data: List[List[float]]) -> Matrix:
         if not all(row for row in data):
             raise ValueError(Matrix._empty_list_error_message)
         elif not all(len(row) == len(data[0]) for row in data):
             raise ValueError(Matrix._row_len_error_message)
-        elif not all((isinstance(x, float) for x in row) for row in data):
-            raise TypeError(Matrix._type_error_message)
+        elif not all(all(isinstance(x, float) for x in row) for row in data):
+            raise TypeError(Matrix._type_error_message + "2D array (float).")
         
         _data = []
 
