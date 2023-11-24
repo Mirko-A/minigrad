@@ -269,7 +269,6 @@ class Matrix:
         rows, cols = self.shape.row, self.shape.col
         
         out_data = []
-        #= Matrix.zeros(rows, cols)
         
         for row in range(rows):
             out_row = []
@@ -350,8 +349,10 @@ class Matrix:
 
 m = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
 n = Matrix.from_2d_array([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
+
 y = Matrix.randn(2, 3)
 y_t = y.T()
+
 print(m + n)
 print(y)
 print(y_t)
