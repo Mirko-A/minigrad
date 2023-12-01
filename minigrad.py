@@ -231,7 +231,7 @@ class Matrix:
     def from_1d_array(data: List[float]) -> Matrix:
         if not data: 
             raise ValueError(Matrix._empty_list_error_message)
-        if not all(isinstance(float, x) for x in data):
+        if not all(isinstance(x, float) for x in data):
             raise TypeError(Matrix._type_error_message + "1D array (float).")
         
         _data = []
@@ -287,9 +287,28 @@ class Matrix:
             for row_idx in range(rows):
                 out_row.append(self.data[row_idx][col_idx])
             out_data.append(out_row)
-
+            
         return Matrix(out_data)
     
+    def mul(self, other: Matrix) -> Matrix:
+        assert isinstance(other, Matrix), f"Cannot multiply Matrix and {type(other)}."
+        assert self.mul_inner_dims_match_with(other), f"Cannot multiply {self.shape.row}x{self.shape.col} and {other.shape.row}x{other.shape.col} Matrices. Inner dimensions must match."
+    
+        x_rows, y_rows, y_cols = self.shape.row, other.shape.row, other.shape.col
+        
+        out_data = []
+        
+        for x_row in range(x_rows):
+            out_row = []
+            for y_col in range(y_cols):
+                temp_data = 0
+                for y_row in range(y_rows):
+                    temp_data += self.data[x_row][y_row] * other.data[y_row][y_col]
+                out_row.append(temp_data)
+            out_data.append(out_row)
+                
+        return Matrix(out_data)
+                
     # ------------------ Dunder ops ------------------
 
     def __add__(self, other):
@@ -297,6 +316,12 @@ class Matrix:
     
     def __radd__(self, other):
         return self.add(other)
+    
+    def __mul__(self, other):
+        return self.mul(other)
+    
+    def __rmul__(self, other):
+        return self.mul(other)
 
     # -------------------- Utility --------------------
     
@@ -306,6 +331,9 @@ class Matrix:
     
     def dims_match_with(self, other: Matrix) -> bool:
         return self.shape == other.shape
+    
+    def mul_inner_dims_match_with(self, other: Matrix) -> bool:
+        return self.shape.col == other.shape.row
 
     def __repr__(self) -> str:
         repr = str("Matrix([")
@@ -350,12 +378,20 @@ class Matrix:
 m = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
 n = Matrix.from_2d_array([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
 
+o = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
+p = Matrix.from_2d_array([[1.3, -0.1, -0.3], [1.8, -2.1, 0.3]])
+
+q = Matrix.from_2d_array([[0.7,  2.1, 3.6], [0.2,  4.1, 1.5],  [2.3, 1.7, 0.9]])
+r = Matrix.from_2d_array([[1.3], [-0.1], [-0.3], [-0.3]])
+
 y = Matrix.randn(2, 3)
 y_t = y.T()
 
-print(m + n)
-print(y)
-print(y_t)
+# print(m + n)
+# print(y)
+# print(y_t)
+print(o * p)
+print(q * r)
 
 a = Value(0.31)
 b = Value(1.5)
@@ -367,7 +403,7 @@ b = Value(1.5)
 
 f = ((a*0.7 + b) ** 2.0) / 1.7
 f = f.tanh()
-print(f)
+# print(f)
 
 #f_t = ((a_t*0.7 + b_t) ** 2.0) / 1.7
 #f_t = f_t.tanh()
@@ -388,4 +424,4 @@ b:{b.grad}
 #b_t:{b_t.grad.item()}
 #"""
 
-print(grads_txt)
+# print(grads_txt)
