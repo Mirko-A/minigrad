@@ -1,6 +1,10 @@
 import unittest
 import math
 
+import sys
+import os
+sys.path.append(os.curdir + "\..")
+
 from minigrad import Value
 
 class TestBinaryOps(unittest.TestCase):

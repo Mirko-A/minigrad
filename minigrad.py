@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import List, Tuple
 
 from random import gauss
 
@@ -13,7 +12,7 @@ import math
 #       in the same order.
 
 class Value:
-    def __init__(self, data: float, _children: Tuple[Value, Value]=()) -> None:
+    def __init__(self, data: float, _children: tuple[Value, Value]=()) -> None:
         self.grad = 0.0
         self._data = data
         self._children = _children
@@ -23,7 +22,8 @@ class Value:
     def data(self) -> float:
         return self._data
 
-    # -------------------- Operators --------------------
+    # Operators
+
     def _add(self, other: Value | float) -> Value:
         if not isinstance(other, Value): other = Value(other)
 
@@ -111,7 +111,8 @@ class Value:
 
         return out
 
-    # -------------------- Dunder ops --------------------
+    # Operator magic methods
+
     def __add__(self, other): return self._add(other)
     def __radd__(self, other): return self._add(other)
     
@@ -129,7 +130,8 @@ class Value:
     def __pow__(self, other): return self._pow(other)
     def __rpow__(self, other): return self._pow(other, True)
 
-    # ----------------- Activation funcs -----------------
+    # Activation funcs
+
     def sigmoid(self):
         def sigmoid_impl(x):
             return 1 / (1 + math.exp(-x))
@@ -167,11 +169,12 @@ class Value:
         
         return out
         
-    # ---------------- Backpropagation ----------------
+    # Backpropagation
+
     def backward(self) -> None:
         self.grad = 1.0
 
-        nodes: List[Value] = []
+        nodes: list[Value] = []
         visited = set()
         def toposort(node: Value):
             if node not in visited:
@@ -187,7 +190,8 @@ class Value:
         for node in reversed(nodes):
             node._backward()
 
-    # -------------------- Utility --------------------
+    # Utility
+
     def exp(self) -> Value:
         return Value(math.exp(self.data))
 
@@ -204,22 +208,24 @@ class Matrix:
         def __eq__(self, __value: Matrix.Shape) -> bool:
             return self.row == __value.row and self.col == __value.col
             
+    # Matrix construction error messages
     _empty_list_error_message = "Cannot construct Matrix from empty list."
     _row_len_error_message = "Cannot construct Matrix. All rows must have the same length."
-    # TODO: Update this error message based on whether scalar, 1d or 2d array was used.
     _type_error_message = "Cannot construct Matrix with given arguments. Expected: "
     
     # NOTE: Mirko A. (11/23/2023) 
     # Please do not use the constructor directly outside of the Matrix class.
     # Matrix can be constructed through the following static methods:
     # 1) from_scalar(float)
-    # 2) from_1d_array(List[float])
-    # 3) from_2d_array(List[List[float]])
-    def __init__(self, data: List[List[Value]]) -> None:
+    # 2) from_1d_array(list[float])
+    # 3) from_2d_array(list[list[float]])
+    def __init__(self, data: list[list[Value]]) -> None:
         assert all((isinstance(x, Value) for x in row) for row in data), "Cannot construct Matrix. Must pass a 2D list of Value objects."
         self.data = data
         self._shape = Matrix.Shape(len(data), len(data[0]))
         
+    # Static construction methods
+
     @staticmethod
     def from_scalar(data: float) -> Matrix:
         if not isinstance(data, float):
@@ -228,7 +234,7 @@ class Matrix:
         return Matrix([[Value(data)]])
     
     @staticmethod
-    def from_1d_array(data: List[float]) -> Matrix:
+    def from_1d_array(data: list[float]) -> Matrix:
         if not data: 
             raise ValueError(Matrix._empty_list_error_message)
         if not all(isinstance(x, float) for x in data):
@@ -242,7 +248,7 @@ class Matrix:
         return Matrix([_data])
     
     @staticmethod
-    def from_2d_array(data: List[List[float]]) -> Matrix:
+    def from_2d_array(data: list[list[float]]) -> Matrix:
         if not all(row for row in data):
             raise ValueError(Matrix._empty_list_error_message)
         elif not all(len(row) == len(data[0]) for row in data):
@@ -260,11 +266,20 @@ class Matrix:
 
         return Matrix(_data)
     
-    # ------------------ Operators ------------------
+    @staticmethod
+    def zeros(rows: int, cols: int) -> Matrix:
+        return Matrix.from_2d_array([ [0.0] * cols for _ in range(rows)])
+
+    @staticmethod
+    def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
+        data = [[gauss(mean, std_dev) for _ in range(rows)] for _ in range(cols)]
+        return Matrix.from_2d_array(data)
+    
+    # Operators
 
     def add(self, other: Matrix) -> Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
-        assert self.dims_match_with(other), "Cannot add Matrices if size doesn't match."
+        assert self._dims_match_with(other), "Cannot add Matrices if shape doesn't match."
 
         rows, cols = self.shape.row, self.shape.col
         
@@ -278,6 +293,19 @@ class Matrix:
 
         return Matrix(out_data)
     
+    def mul(self, other: float) -> Matrix:
+        assert isinstance(other, float), f"Cannot multiply Matrix and {type(other)}."
+
+        out_data = []
+
+        for row in self.data:
+            out_row = []
+            for col in row:
+                out_row.append(col * other)
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+
     def T(self) -> Matrix:
         rows, cols = self.shape.row, self.shape.col
         out_data = []
@@ -290,11 +318,15 @@ class Matrix:
             
         return Matrix(out_data)
     
-    def mul(self, other: Matrix) -> Matrix:
-        assert isinstance(other, Matrix), f"Cannot multiply Matrix and {type(other)}."
-        assert self.mul_inner_dims_match_with(other), f"Cannot multiply {self.shape.row}x{self.shape.col} and {other.shape.row}x{other.shape.col} Matrices. Inner dimensions must match."
+    # Static operators
+
+    @staticmethod
+    def matmul(x: Matrix, y: Matrix) -> Matrix:
+        assert isinstance(x, Matrix), f"Invalid type for matrix matmul product: {type(x)}."
+        assert isinstance(y, Matrix), f"Invalid type for matrix matmul product: {type(y)}."
+        assert x._inner_dims_match_with(y), f"Cannot multiply {x.shape.row}x{x.shape.col} and {y.shape.row}x{y.shape.col} Matrices. Inner dimensions must match."
     
-        x_rows, y_rows, y_cols = self.shape.row, other.shape.row, other.shape.col
+        x_rows, y_rows, y_cols = x.shape.row, y.shape.row, y.shape.col
         
         out_data = []
         
@@ -303,13 +335,28 @@ class Matrix:
             for y_col in range(y_cols):
                 temp_data = 0
                 for y_row in range(y_rows):
-                    temp_data += self.data[x_row][y_row] * other.data[y_row][y_col]
+                    temp_data += x.data[x_row][y_row] * y.data[y_row][y_col]
                 out_row.append(temp_data)
             out_data.append(out_row)
                 
         return Matrix(out_data)
                 
-    # ------------------ Dunder ops ------------------
+    @staticmethod
+    def are_equal(x: Matrix, y: Matrix) -> bool:
+        assert isinstance(x, Matrix), f"Invalid type for matrix equality: {type(x)}."
+        assert isinstance(y, Matrix), f"Invalid type for matrix equality: {type(y)}."
+        assert x._dims_match_with(y), "Cannot compare Matrices if shape doesn't match."
+
+        rows, cols = x.shape.row, x.shape.col
+
+        for row in range(rows):
+            for col in range(cols):
+                if x[row][col] != y[row][col]:
+                    return False
+
+        return True
+
+    # Operator magic methods
 
     def __add__(self, other):
         return self.add(other)
@@ -322,17 +369,31 @@ class Matrix:
     
     def __rmul__(self, other):
         return self.mul(other)
+    
+    def __truediv__(self, other):
+        return self.mul(1.0/other)
+    
+    def __eq__(self, other):
+        return Matrix.are_equal(self, other)
+    
+    def __getitem__(self, key):
+        return self.data[key]
 
-    # -------------------- Utility --------------------
+    # Backpropagation
+
+    def backward(self) -> None:
+        ...
+
+    # Utility
     
     @property
     def shape(self) -> Shape:
         return self._shape
     
-    def dims_match_with(self, other: Matrix) -> bool:
+    def _dims_match_with(self, other: Matrix) -> bool:
         return self.shape == other.shape
     
-    def mul_inner_dims_match_with(self, other: Matrix) -> bool:
+    def _inner_dims_match_with(self, other: Matrix) -> bool:
         return self.shape.col == other.shape.row
 
     def __repr__(self) -> str:
@@ -363,65 +424,29 @@ class Matrix:
         repr += "])"
 
         return repr
-    
-    # ----------------- Static methods ------------------
-
-    @staticmethod
-    def zeros(rows: int, cols: int) -> Matrix:
-        return Matrix.from_2d_array([ [0.0] * cols for _ in range(rows)])
-
-    @staticmethod
-    def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
-        data = [[gauss(mean, std_dev) for _ in range(rows)] for _ in range(cols)]
-        return Matrix.from_2d_array(data)
 
 m = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
-n = Matrix.from_2d_array([[1.3, -0.1], [1.8, -2.1], [-0.3, 0.3]])
+n = Matrix.from_2d_array([[1.8, -2.1], [-0.3, 0.3]])
 
-o = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
-p = Matrix.from_2d_array([[1.3, -0.1, -0.3], [1.8, -2.1, 0.3]])
+#m_pt = torch.tensor([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]]); m_pt.requires_grad = True
+#n_pt = torch.tensor([[1.8, -2.1], [-0.3, 0.3]]); m_pt.requires_grad = True
 
-q = Matrix.from_2d_array([[0.7,  2.1, 3.6], [0.2,  4.1, 1.5],  [2.3, 1.7, 0.9]])
-r = Matrix.from_2d_array([[1.3], [-0.1], [-0.3], [-0.3]])
+f = Matrix.matmul((2.0*m), n)
+#f_t = torch.matmul((2.0*m_pt), n_pt)
 
-y = Matrix.randn(2, 3)
-y_t = y.T()
+#o = torch.tensor([2.0, 1.7, 3.3])
+#o = o.softmax(0)
 
-# print(m + n)
-# print(y)
-# print(y_t)
-print(o * p)
-print(q * r)
-
-a = Value(0.31)
-b = Value(1.5)
-
-#t = torch.tensor([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]])
-#print(t)
-#a_t = torch.Tensor([0.31]); a_t.requires_grad = True
-#b_t = torch.Tensor([1.5]); b_t.requires_grad = True
-
-f = ((a*0.7 + b) ** 2.0) / 1.7
-f = f.tanh()
-# print(f)
-
-#f_t = ((a_t*0.7 + b_t) ** 2.0) / 1.7
-#f_t = f_t.tanh()
+#f_t = f_t.softmax(1)
 #print(f_t)
 
-f.backward()
+#f.backward()
 #f_t.backward()
 
-grads_txt = f"""
-a:{a.grad}
-b:{b.grad}
-"""
+# for row in f.data:
+#     for value in row:
+#         print(value.grad)
 
-#grads_txt = f"""
-#a:{a.grad}
-#a_t:{a_t.grad.item()}
-#b:{b.grad}
-#b_t:{b_t.grad.item()}
-#"""
-
-# print(grads_txt)
+# for row in f_t.data:
+#     for value in row:
+#         print(value.grad)
