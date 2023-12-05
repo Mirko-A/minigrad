@@ -105,7 +105,7 @@ class Value:
         
         def _backward():
             x.grad += out.grad * (y.data * (x.data ** (y.data - 1)))
-            y.grad += out.grad * ((x.data ** y.data) * math.log(y.data))
+            y.grad += out.grad * ((x.data ** y.data) * math.log(x.data))
 
         out._backward = _backward
 
