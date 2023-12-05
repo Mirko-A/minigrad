@@ -4,7 +4,7 @@ from random import gauss
 
 import math
 
-#import torch
+# import torch
 
 # NOTE: Children of a Value which is created as a result of commutative operations
 #       might be swapped if it is called from r-operation. Potentailly the reverse
@@ -282,7 +282,6 @@ class Matrix:
         assert self._dims_match_with(other), "Cannot add Matrices if shape doesn't match."
 
         rows, cols = self.shape.row, self.shape.col
-        
         out_data = []
         
         for row in range(rows):
@@ -327,7 +326,6 @@ class Matrix:
         assert x._inner_dims_match_with(y), f"Cannot multiply {x.shape.row}x{x.shape.col} and {y.shape.row}x{y.shape.col} Matrices. Inner dimensions must match."
     
         x_rows, y_rows, y_cols = x.shape.row, y.shape.row, y.shape.col
-        
         out_data = []
         
         for x_row in range(x_rows):
@@ -378,6 +376,60 @@ class Matrix:
     
     def __getitem__(self, key):
         return self.data[key]
+    
+    # Activation funcs
+    
+    def sigmoid(self):
+        rows, cols = self.shape.row, self.shape.col
+        out_data = []
+        
+        for row in range(rows):
+            out_row = []
+            for col in range(cols):
+                out_row.append(self.data[row][col].sigmoid())
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+    
+
+    def relu(self):
+        rows, cols = self.shape.row, self.shape.col
+        out_data = []
+        
+        for row in range(rows):
+            out_row = []
+            for col in range(cols):
+                out_row.append(self.data[row][col].relu())
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+
+    def tanh(self):
+        rows, cols = self.shape.row, self.shape.col
+        out_data = []
+        
+        for row in range(rows):
+            out_row = []
+            for col in range(cols):
+                out_row.append(self.data[row][col].tanh())
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+    
+    def softmax(self, axis=0):
+        new = self if axis == 1 else self.T()
+        rows, cols = new.shape.row, new.shape.col
+        expsum = new._expsum()
+        out_data = []
+        
+        for row in range(rows):
+            out_row = []
+            for col in range(cols):
+                sm = new.data[row][col].exp() / expsum[row]
+                out_row.append(sm)
+            out_data.append(out_row)
+
+        return Matrix(out_data).T() if axis == 0 else Matrix(out_data)
 
     # Backpropagation
 
@@ -389,6 +441,19 @@ class Matrix:
     @property
     def shape(self) -> Shape:
         return self._shape
+    
+    def _expsum(self) -> list:
+        rows, cols = self.shape.row, self.shape.col
+        out_data = []
+        
+        for row in range(rows):
+            row_expsum = 0.0
+            for col in range(cols):
+                val_exp = self.data[row][col].exp()
+                row_expsum += val_exp
+            out_data.append(row_expsum)
+            
+        return out_data
     
     def _dims_match_with(self, other: Matrix) -> bool:
         return self.shape == other.shape
@@ -430,6 +495,16 @@ n = Matrix.from_2d_array([[1.8, -2.1], [-0.3, 0.3]])
 
 #m_pt = torch.tensor([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]]); m_pt.requires_grad = True
 #n_pt = torch.tensor([[1.8, -2.1], [-0.3, 0.3]]); m_pt.requires_grad = True
+
+# sigmoid = m.sigmoid()
+# relu = m.relu()
+# tanh = m.tanh()
+softmax_0 = m.softmax(0)
+softmax_1 = m.softmax(1)
+# print(sigmoid)
+# print(relu)
+# print(tanh)
+print(f'Original:\n{m}\n\nSoftmax axis 0:\n{softmax_0}\n\nSoftmax axis 1:\n{softmax_1}')
 
 f = Matrix.matmul((2.0*m), n)
 #f_t = torch.matmul((2.0*m_pt), n_pt)
