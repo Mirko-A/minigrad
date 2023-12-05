@@ -417,15 +417,15 @@ class Matrix:
         return Matrix(out_data)
     
     def softmax(self, axis=0):
-        new = self if axis == 1 else self.T()
-        rows, cols = new.shape.row, new.shape.col
-        expsum = new._expsum()
+        matrix = self if axis == 1 else self.T()
+        rows, cols = matrix.shape.row, matrix.shape.col
+        expsum = matrix._expsum()
         out_data = []
         
         for row in range(rows):
             out_row = []
             for col in range(cols):
-                sm = new.data[row][col].exp() / expsum[row]
+                sm = matrix.data[row][col].exp() / expsum[row]
                 out_row.append(sm)
             out_data.append(out_row)
 
