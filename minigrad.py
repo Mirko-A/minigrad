@@ -4,8 +4,6 @@ from random import gauss
 
 import math
 
-# import torch
-
 # NOTE: Children of a Value which is created as a result of commutative operations
 #       might be swapped if it is called from r-operation. Potentailly the reverse
 #       flag might be needed for those operations just to keep the children always
@@ -340,8 +338,7 @@ class Matrix:
             return Matrix([[out_data]])
 
         def sum_along_dim(in_mat: Matrix, dim: int) -> Matrix:
-            if dim == 0:
-                in_mat = in_mat.T()
+            in_mat = in_mat if dim == 1 else in_mat.T()
 
             out_data = []
 
@@ -497,6 +494,30 @@ class Matrix:
     def shape(self) -> Shape:
         return self._shape
     
+    # Function returns one of the following:
+    # a) list[list[Value]] -> When row >  1 and col > 1 
+    # b) list[Value]       -> When row == 1 and col > 1
+    # c) Value             -> When row == 1 and col == 1
+    def item(self) -> list[list[Value]] | list[Value] | Value:
+        row, col = self.shape.row, self.shape.col
+
+        out_data = None
+
+        if row > 1 and col > 1:
+            out_data = self.data
+        elif row > 1 and col == 1:
+            out_data = [row[0] for row in self.data]
+        elif row == 1 and col > 1:
+            out_data = self.data[0]
+        else:
+            out_data = self.data[0][0]
+
+        return out_data
+
+    # Returns gradients of all elements in a list[list[float]]
+    def grad(self) -> list[list[float]]:
+        return [[data.grad for data in row] for row in self.data]
+
     def _expsum(self) -> list:
         rows, cols = self.shape.row, self.shape.col
         out_data = []
@@ -544,39 +565,3 @@ class Matrix:
         repr += "])"
 
         return repr
-
-m = Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
-n = Matrix.from_2d_array([[1.8, -2.1], [-0.3, 0.3]])
-
-#m_pt = torch.tensor([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]]); m_pt.requires_grad = True
-#n_pt = torch.tensor([[1.8, -2.1], [-0.3, 0.3]]); m_pt.requires_grad = True
-
-# sigmoid = m.sigmoid()
-# relu = m.relu()
-# tanh = m.tanh()
-softmax_0 = m.softmax(0)
-softmax_1 = m.softmax(1)
-# print(sigmoid)
-# print(relu)
-# print(tanh)
-print(f'Original:\n{m}\n\nSoftmax axis 0:\n{softmax_0}\n\nSoftmax axis 1:\n{softmax_1}')
-
-f = Matrix.matmul((2.0*m), n)
-#f_t = torch.matmul((2.0*m_pt), n_pt)
-
-#o = torch.tensor([2.0, 1.7, 3.3])
-#o = o.softmax(0)
-
-#f_t = f_t.softmax(1)
-#print(f_t)
-
-#f.backward()
-#f_t.backward()
-
-# for row in f.data:
-#     for value in row:
-#         print(value.grad)
-
-# for row in f_t.data:
-#     for value in row:
-#         print(value.grad)
