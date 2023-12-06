@@ -174,8 +174,8 @@ class Value:
         
     # Backpropagation
 
-    def backward(self) -> None:
-        self.grad = 1.0
+    def backward(self, grad = 1.0) -> None:
+        self.grad = grad
 
         nodes: list[Value] = []
         visited = set()
