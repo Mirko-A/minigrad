@@ -22,7 +22,7 @@ class Value:
     def data(self) -> float:
         return self._data
 
-    # Operators
+    # Operations
 
     def _add(self, other: Value | float) -> Value:
         if not isinstance(other, Value): other = Value(other)
@@ -111,6 +111,9 @@ class Value:
 
         return out
 
+    def exp(self) -> Value:
+        return Value(math.exp(self.data))
+
     # Operator magic methods
 
     def __add__(self, other): return self._add(other)
@@ -192,9 +195,6 @@ class Value:
 
     # Utility
 
-    def exp(self) -> Value:
-        return Value(math.exp(self.data))
-
     def __repr__(self) -> str:
         return f"Value({self.data})"
 
@@ -275,7 +275,7 @@ class Matrix:
         data = [[gauss(mean, std_dev) for _ in range(rows)] for _ in range(cols)]
         return Matrix.from_2d_array(data)
     
-    # Operators
+    # Operations
 
     def add(self, other: Matrix) -> Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
@@ -316,8 +316,8 @@ class Matrix:
             out_data.append(out_row)
             
         return Matrix(out_data)
-    
-    # Static operators
+
+    # Static operations
 
     @staticmethod
     def matmul(x: Matrix, y: Matrix) -> Matrix:
@@ -353,7 +353,7 @@ class Matrix:
                     return False
 
         return True
-
+    
     # Operator magic methods
 
     def __add__(self, other):
@@ -376,7 +376,7 @@ class Matrix:
     
     def __getitem__(self, key):
         return self.data[key]
-    
+
     # Activation funcs
     
     def sigmoid(self):
@@ -390,7 +390,6 @@ class Matrix:
             out_data.append(out_row)
 
         return Matrix(out_data)
-    
 
     def relu(self):
         rows, cols = self.shape.row, self.shape.col
