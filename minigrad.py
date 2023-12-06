@@ -468,25 +468,30 @@ class Matrix:
 
         return Matrix(out_data)
     
-    def softmax(self, axis=0):
-        matrix = self if axis == 1 else self.T()
-        rows, cols = matrix.shape.row, matrix.shape.col
-        expsum = matrix._expsum()
+    def softmax(self, dim: int = 0):
+        in_mat = self if dim == 1 else self.T()
+        in_mat_exp = in_mat.exp()
+        in_mat_exp_sums = in_mat_exp.sum(dim=1).item()
+
         out_data = []
         
-        for row in range(rows):
+        for row_exp, row_exp_sum in zip(in_mat_exp.data, in_mat_exp_sums):
             out_row = []
-            for col in range(cols):
-                sm = matrix.data[row][col].exp() / expsum[row]
-                out_row.append(sm)
+
+            for value_exp in row_exp:
+                probability = value_exp / row_exp_sum
+                out_row.append(probability)
             out_data.append(out_row)
 
-        return Matrix(out_data).T() if axis == 0 else Matrix(out_data)
+        out_mat = Matrix(out_data)
+
+        return out_mat if dim == 1 else out_mat.T()
 
     # Backpropagation
 
     def backward(self) -> None:
-        ...
+        # TODO: Naive implementation
+        self.data[0][0].backward()
 
     # Utility
     
@@ -518,19 +523,6 @@ class Matrix:
     def grad(self) -> list[list[float]]:
         return [[data.grad for data in row] for row in self.data]
 
-    def _expsum(self) -> list:
-        rows, cols = self.shape.row, self.shape.col
-        out_data = []
-        
-        for row in range(rows):
-            row_expsum = 0.0
-            for col in range(cols):
-                val_exp = self.data[row][col].exp()
-                row_expsum += val_exp
-            out_data.append(row_expsum)
-            
-        return out_data
-    
     def _dims_match_with(self, other: Matrix) -> bool:
         return self.shape == other.shape
     
