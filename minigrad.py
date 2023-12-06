@@ -112,7 +112,7 @@ class Value:
         return out
 
     def exp(self) -> Value:
-        return Value(math.exp(self.data))
+        return math.e ** self
 
     # Operator magic methods
 
