@@ -317,6 +317,62 @@ class Matrix:
             
         return Matrix(out_data)
 
+    def flatten(self) -> Matrix:
+        out_data = []
+
+        for row in self.data:
+            for value in row:
+                out_data.append(value)
+
+        return Matrix([out_data])
+
+    def sum(self, dim: int | None = None) -> Matrix:
+        VALID_AXIS_VALUES = [None, 0, 1]
+        assert dim in VALID_AXIS_VALUES, "Invalid value for dim provided. Expected: None, 0 or 1."
+        
+        def sum_all(in_mat: Matrix) -> Matrix:
+            out_data = Value(0.0)
+
+            for row in in_mat.data:
+                for value in row:
+                    out_data += value
+
+            return Matrix([[out_data]])
+
+        def sum_along_dim(in_mat: Matrix, dim: int) -> Matrix:
+            if dim == 0:
+                in_mat = in_mat.T()
+
+            out_data = []
+
+            for row in in_mat.data:
+                out_row = Value(0.0)
+                
+                for value in row:
+                    out_row += value
+
+                out_data.append([out_row])
+
+            return Matrix(out_data)
+
+        if dim is None:
+            return sum_all(self)
+        else:
+            return sum_along_dim(self, dim)
+
+    def exp(self) -> Matrix:
+        out_data = []
+
+        for row in self.data:
+            out_row = []
+
+            for value in row:
+                out_row.append(value.exp())
+
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+
     # Static operations
 
     @staticmethod
