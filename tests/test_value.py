@@ -239,7 +239,7 @@ class TestBackwardFuncs(unittest.TestCase):
         b = 1.7
 
         a_grad = b * (a.data ** (b - 1))
-        b_grad = (a.data ** b) * math.log(b)
+        b_grad = (a.data ** b) * math.log(a.data)
 
         c = a ** b
         c.backward()
@@ -251,7 +251,7 @@ class TestBackwardFuncs(unittest.TestCase):
         b = Value(1.7)
 
         a_grad = b.data * (a ** (b.data - 1))
-        b_grad = (a ** b.data) * math.log(b.data)
+        b_grad = (a ** b.data) * math.log(a)
 
         c = a ** b
         c.backward()
@@ -263,7 +263,7 @@ class TestBackwardFuncs(unittest.TestCase):
         b = Value(1.7)
 
         a_grad = b.data * (a.data ** (b.data - 1))
-        b_grad = (a.data ** b.data) * math.log(b.data)
+        b_grad = (a.data ** b.data) * math.log(a.data)
 
         c = a ** b
         c.backward()
