@@ -270,7 +270,7 @@ class Matrix:
 
     @staticmethod
     def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
-        data = [[gauss(mean, std_dev) for _ in range(rows)] for _ in range(cols)]
+        data = [[gauss(mean, std_dev) for _ in range(cols)] for _ in range(rows)]
         return Matrix.from_2d_array(data)
     
     # Operations
