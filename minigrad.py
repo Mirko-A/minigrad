@@ -108,6 +108,20 @@ class Value:
         out._backward = _backward
 
         return out
+    
+    def log(self, base: Value | float = math.e) -> Value:        
+        if not isinstance(base, Value): base = Value(base)
+        
+        x, y = self, base
+        out = Value(math.log(self.data, base.data))
+        
+        def _backward():
+            x.grad += out.grad * (1 / x.data * y.log())
+            y.grad += out.grad * (-(x.log() / y.data * y.log() ** 2))
+            
+        out._backward = _backward
+        
+        return out
 
     def exp(self) -> Value:
         return math.e ** self
@@ -369,6 +383,19 @@ class Matrix:
             out_data.append(out_row)
 
         return Matrix(out_data)
+    
+    def log(self, base: Value | float = math.e) -> Matrix:
+        out_data = []
+
+        for row in self.data:
+            out_row = []
+
+            for value in row:
+                out_row.append(value.log(base))
+
+            out_data.append(out_row)
+
+        return Matrix(out_data)
 
     # Static operations
 
@@ -472,7 +499,6 @@ class Matrix:
         in_mat = self if dim == 1 else self.T()
         in_mat_exp = in_mat.exp()
         in_mat_exp_sums = in_mat_exp.sum(dim=1).item()
-
         out_data = []
         
         for row_exp, row_exp_sum in zip(in_mat_exp.data, in_mat_exp_sums):
@@ -485,6 +511,25 @@ class Matrix:
 
         out_mat = Matrix(out_data)
 
+        return out_mat if dim == 1 else out_mat.T()
+
+    # Loss funcs
+    
+    def cross_entropy(self, target: Matrix, dim: int = 0):
+        in_mat = self if dim == 1 else self.T()
+        in_mat_log = in_mat.log(2)
+        out_data = []
+        
+        for row in range(in_mat.shape.row):
+            row_sum = Value(0.0)
+            
+            for col in range(in_mat.shape.col):
+                mul = target[row][col] * in_mat_log[row][col]
+                row_sum += mul
+            out_data.append(-row_sum)
+            
+        out_mat = Matrix([out_data])
+        
         return out_mat if dim == 1 else out_mat.T()
 
     # Backpropagation
@@ -519,7 +564,6 @@ class Matrix:
 
         return out_data
 
-    # Returns gradients of all elements in a list[list[float]]
     def grad(self) -> list[list[float]]:
         return [[data.grad for data in row] for row in self.data]
 
