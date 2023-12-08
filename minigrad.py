@@ -264,16 +264,62 @@ class Matrix:
 
         return Matrix(_data)
     
+    # Static Matrix generation methods
+
+    @staticmethod
+    def fill(rows: int, cols: int, value: float) -> Matrix:
+        return Matrix.from_2d_array([[value] * cols for _ in range(rows)])
+
     @staticmethod
     def zeros(rows: int, cols: int) -> Matrix:
-        return Matrix.from_2d_array([ [0.0] * cols for _ in range(rows)])
+        return Matrix.fill(rows, cols, 0.0)
 
     @staticmethod
     def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
         data = [[gauss(mean, std_dev) for _ in range(cols)] for _ in range(rows)]
         return Matrix.from_2d_array(data)
     
+    @staticmethod
+    def replace(in_mat: Matrix, target: float, new: float) -> Matrix:
+        out_data = []
+        
+        for row in in_mat.data:
+            out_row = []
+
+            for value in row:
+                out_row.append(Value(new) if value.data == target else value)
+
+            out_data.append(out_row)
+
+        return Matrix(out_data)
+    
+
     # Operations
+
+    def is_equal_to(self, target: Matrix) -> bool:
+        assert self._dims_match_with(target), "Cannot compare Matrices if shape doesn't match."
+
+        rows, cols = self.shape.row, self.shape.col
+
+        for row in range(rows):
+            for col in range(cols):
+                if self[row][col] != target[row][col]:
+                    return False
+
+        return True
+    
+    def is_elementwise_equal_to(self, target: float) -> list[list[bool]]:
+        out_data = []
+
+        for row in self.data:
+            out_row = []
+
+            for value in row:
+                out_row.append(True if value == target else False)
+
+            out_data.append(out_row)
+
+        return out_data
 
     def add(self, other: Matrix) -> Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
@@ -391,22 +437,7 @@ class Matrix:
             out_data.append(out_row)
                 
         return Matrix(out_data)
-                
-    @staticmethod
-    def are_equal(x: Matrix, y: Matrix) -> bool:
-        assert isinstance(x, Matrix), f"Invalid type for matrix equality: {type(x)}."
-        assert isinstance(y, Matrix), f"Invalid type for matrix equality: {type(y)}."
-        assert x._dims_match_with(y), "Cannot compare Matrices if shape doesn't match."
 
-        rows, cols = x.shape.row, x.shape.col
-
-        for row in range(rows):
-            for col in range(cols):
-                if x[row][col] != y[row][col]:
-                    return False
-
-        return True
-    
     # Operator magic methods
 
     def __add__(self, other):
@@ -425,8 +456,13 @@ class Matrix:
         return self.mul(1.0/other)
     
     def __eq__(self, other):
-        return Matrix.are_equal(self, other)
-    
+        if isinstance(other, Matrix):
+            return self.is_equal_to(other)
+        elif isinstance(other, float):
+            return self.is_elementwise_equal_to(other)
+        else:
+            assert False, f"Invalid type for matrix equality: {type(other)}. Expected Matrix or float."
+
     def __getitem__(self, key):
         return self.data[key]
 
