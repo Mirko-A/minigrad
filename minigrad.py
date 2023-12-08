@@ -12,7 +12,8 @@ import math
 
 class Value:
     def __init__(self, data: float, _children: tuple[Value, Value]=()) -> None:
-        assert isinstance(data, float), f"Cannot construct Value object with type: {type(data)}. Expected float."
+        assert isinstance(data, (float, int)) and not isinstance(data, bool), f"Cannot construct Value object with type: {type(data)}. Expected float."
+        if not isinstance(data, float): data = float(data)
 
         self.grad = 0.0
         self._data = data
@@ -114,27 +115,13 @@ class Value:
     
     def log(self, base: Value | float = math.e) -> Value:        
         if not isinstance(base, Value): base = Value(base)
+        arg = self
         
-        x, y = self, base
         out = Value(math.log(self.data, base.data))
         
         def _backward():
-            x.grad += out.grad * (1 / x.data * y.log())
-            y.grad += out.grad * (-(x.log() / y.data * y.log() ** 2))
-            
-        out._backward = _backward
-        
-        return out
-    
-    def log(self, base: Value | float = math.e) -> Value:        
-        if not isinstance(base, Value): base = Value(base)
-        
-        x, y = self, base
-        out = Value(math.log(self.data, base.data))
-        
-        def _backward():
-            x.grad += out.grad * (1 / x.data * y.log())
-            y.grad += out.grad * (-(x.log() / y.data * y.log() ** 2))
+            arg.grad += out.grad * (1 / (arg.data * math.log(base.data)))
+            base.grad += out.grad * (-(math.log(arg.data) / (base.data * math.log(base.data) ** 2)))
             
         out._backward = _backward
         
