@@ -628,7 +628,7 @@ class Matrix:
     
     def cross_entropy(self, target: Matrix, dim: int = 0):
         in_mat = self if dim == 1 else self.T()
-        in_mat_log = in_mat.log(2)
+        in_mat_log = in_mat.log(2.0)
         out_data = []
         
         for row in range(in_mat.shape.row):
