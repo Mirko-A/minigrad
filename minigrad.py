@@ -303,7 +303,7 @@ class Matrix:
 
         for row in range(rows):
             for col in range(cols):
-                if self[row][col] != target[row][col]:
+                if self[row][col].data != target[row][col].data:
                     return False
 
         return True
@@ -315,7 +315,7 @@ class Matrix:
             out_row = []
 
             for value in row:
-                out_row.append(True if value == target else False)
+                out_row.append(True if value.data == target else False)
 
             out_data.append(out_row)
 
@@ -463,7 +463,7 @@ class Matrix:
         else:
             assert False, f"Invalid type for matrix equality: {type(other)}. Expected Matrix or float."
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> list[Value]:
         return self.data[key]
 
     # Activation funcs
