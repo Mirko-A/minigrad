@@ -2,7 +2,20 @@ import minigrad
 import torch
 import torch.nn as nn
 
-m = minigrad.Matrix.from_2d_array([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]])
+m = minigrad.Matrix.from_2d_array([[0.2, 0.3, -0.5, 0.3, -0.5, 0.3, -0.5], 
+                                   [0.2, 0.2,  1.2, 0.3, -0.5, 0.3, -0.5], 
+                                   [0.2, 0.2,  1.2, 0.3, -0.5, 0.3, -0.5], 
+                                   [0.2, 0.2,  1.2, 0.3, -0.5, 0.3, -0.5], 
+                                   [0.2, 0.2,  1.2, 0.3, -0.5, 0.3, -0.5], 
+                                   [0.2, 0.2,  1.2, 0.3, -0.5, 0.3, -0.5],  
+                                   [2.3, 0.2,  7.8, 0.3, -0.5, 0.3, -0.5]])
+mask = m == 0.2
+
+n = minigrad.Matrix.masked_fill(m, mask, 7.6)
+print(n)
+tril_test = minigrad.Matrix.tril(n)
+print(tril_test)
+
 b = 2.0 * m
 c = b + m
 n = c.softmax(0)
@@ -35,7 +48,8 @@ print(f'Softmax (0):\n{n}\nCross-entropy (0):\n{ce_0}\n\nSoftmax (1):\n{n_1}\nCr
 #     for value in row:
 #         print(value.grad)
 
-m_pt = torch.tensor([[0.7,  2.1], [0.2,  4.1],  [2.3, 1.7]]); m_pt.requires_grad = True
+m_pt = torch.tensor([[0.2,  0.3, 0.3], [0.2,  0.2, 0.3],  [2.3, 0.2, 0.3]]); m_pt.requires_grad = True
+#print(torch.tril(m_pt))
 b_pt = 2 * m_pt
 c_pt = b_pt + m_pt
 n_pt = c_pt.softmax(0)
