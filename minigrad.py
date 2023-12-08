@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from random import gauss
 
 import math
@@ -197,6 +198,10 @@ class Value:
         return f"Value({self.data})"
 
 class Matrix:
+    class Diagonal(Enum):
+        LOWER = 0
+        UPPER = 1
+
     class Shape:
         def __init__(self, row: int, col: int) -> None:
             assert row > 0 and col > 0, "Row and column must be natural numbers."
@@ -254,15 +259,17 @@ class Matrix:
         elif not all(all(isinstance(x, float) for x in row) for row in data):
             raise TypeError(Matrix._type_error_message + "2D array (float).")
         
-        _data = []
+        value_data = []
 
         for row in data:
-            _row = []
-            for x in row:
-                _row.append(Value(x))
-            _data.append(_row)
+            value_row = []
 
-        return Matrix(_data)
+            for x in row:
+                value_row.append(Value(x))
+
+            value_data.append(value_row)
+
+        return Matrix(value_data)
     
     # Static Matrix generation methods
 
@@ -280,10 +287,14 @@ class Matrix:
         return Matrix.from_2d_array(data)
     
     @staticmethod
-    def replace(in_mat: Matrix, target: float, new: float) -> Matrix:
+    def masked_fill(input):
+        ...
+        
+    @staticmethod
+    def replace(input: Matrix, target: float, new: float) -> Matrix:
         out_data = []
         
-        for row in in_mat.data:
+        for row in input.data:
             out_row = []
 
             for value in row:
@@ -293,6 +304,9 @@ class Matrix:
 
         return Matrix(out_data)
     
+    @staticmethod
+    def tril(input: Matrix, diagonal: Diagonal = Diagonal.LOWER):
+        ...
 
     # Operations
 
@@ -330,8 +344,10 @@ class Matrix:
         
         for row in range(rows):
             out_row = []
+
             for col in range(cols):
                 out_row.append(self.data[row][col] + other.data[row][col])
+
             out_data.append(out_row)
 
         return Matrix(out_data)
@@ -343,8 +359,10 @@ class Matrix:
 
         for row in self.data:
             out_row = []
+
             for col in row:
                 out_row.append(col * other)
+
             out_data.append(out_row)
 
         return Matrix(out_data)
@@ -355,8 +373,10 @@ class Matrix:
 
         for col_idx in range(cols):
             out_row = []
+
             for row_idx in range(rows):
                 out_row.append(self.data[row_idx][col_idx])
+
             out_data.append(out_row)
             
         return Matrix(out_data)
@@ -374,21 +394,20 @@ class Matrix:
         VALID_AXIS_VALUES = [None, 0, 1]
         assert dim in VALID_AXIS_VALUES, "Invalid value for dim provided. Expected: None, 0 or 1."
         
-        def sum_all(in_mat: Matrix) -> Matrix:
+        def sum_all(input: Matrix) -> Matrix:
             out_data = Value(0.0)
 
-            for row in in_mat.data:
+            for row in input.data:
                 for value in row:
                     out_data += value
 
             return Matrix([[out_data]])
 
-        def sum_along_dim(in_mat: Matrix, dim: int) -> Matrix:
-            in_mat = in_mat if dim == 1 else in_mat.T()
-
+        def sum_along_dim(input: Matrix, dim: int) -> Matrix:
+            input = input if dim == 1 else input.T()
             out_data = []
 
-            for row in in_mat.data:
+            for row in input.data:
                 out_row = Value(0.0)
                 
                 for value in row:
@@ -429,11 +448,15 @@ class Matrix:
         
         for x_row in range(x_rows):
             out_row = []
+
             for y_col in range(y_cols):
                 temp_data = 0
+
                 for y_row in range(y_rows):
                     temp_data += x.data[x_row][y_row] * y.data[y_row][y_col]
+
                 out_row.append(temp_data)
+
             out_data.append(out_row)
                 
         return Matrix(out_data)
@@ -474,8 +497,10 @@ class Matrix:
         
         for row in range(rows):
             out_row = []
+
             for col in range(cols):
                 out_row.append(self.data[row][col].sigmoid())
+
             out_data.append(out_row)
 
         return Matrix(out_data)
@@ -486,8 +511,10 @@ class Matrix:
         
         for row in range(rows):
             out_row = []
+
             for col in range(cols):
                 out_row.append(self.data[row][col].relu())
+
             out_data.append(out_row)
 
         return Matrix(out_data)
@@ -498,20 +525,21 @@ class Matrix:
         
         for row in range(rows):
             out_row = []
+
             for col in range(cols):
                 out_row.append(self.data[row][col].tanh())
+
             out_data.append(out_row)
 
         return Matrix(out_data)
     
     def softmax(self, dim: int = 0):
-        in_mat = self if dim == 1 else self.T()
-        in_mat_exp = in_mat.exp()
-        in_mat_exp_sums = in_mat_exp.sum(dim=1).item()
-
+        input = self if dim == 1 else self.T()
+        input_exp = input.exp()
+        input_exp_sums = input_exp.sum(dim=1).item()
         out_data = []
         
-        for row_exp, row_exp_sum in zip(in_mat_exp.data, in_mat_exp_sums):
+        for row_exp, row_exp_sum in zip(input_exp.data, input_exp_sums):
             out_row = []
 
             for value_exp in row_exp:
@@ -519,9 +547,9 @@ class Matrix:
                 out_row.append(probability)
             out_data.append(out_row)
 
-        out_mat = Matrix(out_data)
+        output = Matrix(out_data)
 
-        return out_mat if dim == 1 else out_mat.T()
+        return output if dim == 1 else output.T()
 
     # Backpropagation
 
@@ -541,8 +569,6 @@ class Matrix:
     # c) Value             -> When row == 1 and col == 1
     def item(self) -> list[list[Value]] | list[Value] | Value:
         row, col = self.shape.row, self.shape.col
-
-        out_data = None
 
         if row > 1 and col > 1:
             out_data = self.data
