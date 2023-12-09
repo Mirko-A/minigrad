@@ -4,20 +4,29 @@ import torch.nn as nn
 import math
 import time
 
-start_time = time.time()
+m = Matrix.from_2d_array([[43.6, 44.4, 45.2, 46.0, 46.8], [32.4, 31.9, 28.6, 39.1, 40.2], [40.8, 52.1, 33.8, 51.7, 60.3]])
+target_1 = Matrix.from_2d_array([[41.0, 30.0, 42.0], [45.0, 35.0, 50.0], [49.0, 28.0, 35.0], [47.0, 37.0, 54.0], [44.0, 39.0, 59.0]])
+target_2 = Matrix.from_2d_array([[41.0, 45.0, 49.0, 47.0, 44.0], [30.0, 35.0, 28.0, 37.0, 39.0], [42.0, 50.0, 35.0, 54.0, 59.0]])
 
-N = 16
+mse_1 = m.mse(target_1)
+mse_2 = m.mse(target_2, 1)
 
-a = torch.randn(N, N)
-b = torch.randn(N, N)
+print(f'MSE 1:\n{mse_1}\n\nMSE 2:\n{mse_2}')
+
+# start_time = time.time()
+
+# N = 16
+
+# a = torch.randn(N, N)
+# b = torch.randn(N, N)
 # a = Matrix.randn(N, N)
 # b = Matrix.randn(N, N)
 
-for i in range(100):
-    c = torch.matmul(a, b)
+# for i in range(100):
+    # c = torch.matmul(a, b)
     # c = Matrix.matmul(a, b)
 
-print("--- %s seconds ---" % (time.time() - start_time))
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 # a = Matrix.fill(8, 8, 1.0)
 # b = Matrix.tril(a)

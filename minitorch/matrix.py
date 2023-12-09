@@ -421,6 +421,24 @@ class Matrix:
         out_mat = Matrix([out_data])
         
         return out_mat if dim == 1 else out_mat.T()
+    
+    def mse(self, target: Matrix, dim: int = 0):
+        in_mat = self if dim == 1 else self.T()
+        out_data = []
+        
+        for row in range(in_mat.shape.row):
+            row_sum = Value(0.0)
+            
+            for col in range(in_mat.shape.col):
+                squared_sub = (target[row][col] - in_mat[row][col]) ** 2
+                row_sum += squared_sub
+                
+            mse = row_sum / in_mat.shape.col
+            out_data.append(mse)
+        
+        out_mat = Matrix([out_data])
+        
+        return out_mat if dim == 1 else out_mat.T()
 
     # Backpropagation
 
