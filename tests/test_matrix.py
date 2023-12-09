@@ -170,7 +170,7 @@ class TestBinaryOps(unittest.TestCase):
         
         b = Matrix.from_2d_array([[0.8],  [1.4], [2.1]])
         
-        result = Matrix.matmul(a, b)
+        result = a.matmul(b)
         
         # Check shape
         self.assertEqual(a.shape.row, result.shape.row)

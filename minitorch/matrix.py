@@ -130,9 +130,9 @@ class Matrix:
     
     @staticmethod
     def tril(input: Matrix, diagonal: Diagonal = Diagonal.LOWER):
-        assert input.shape.row == input.shape.col, "Can only apply tril to square matrices."
+        assert input._is_square(), "Cannot apply tril to non-square matrices."
+        
         out_data = []
-
         tril_cursor = 1
 
         for row in input.data:
@@ -286,28 +286,24 @@ class Matrix:
 
         return Matrix(out_data)
 
-    # Static operations
-
-    @staticmethod
-    def matmul(x: Matrix, y: Matrix) -> Matrix:
-        assert isinstance(x, Matrix), f"Invalid type for matrix matmul product: {type(x)}."
-        assert isinstance(y, Matrix), f"Invalid type for matrix matmul product: {type(y)}."
-        assert x._inner_dims_match_with(y), \
-               f"Cannot multiply {x.shape.row}x{x.shape.col} and {y.shape.row}x{y.shape.col} Matrices. Inner dimensions must match."
+    def matmul(self, other: Matrix) -> Matrix:
+        assert isinstance(other, Matrix), f"Invalid type for matrix matmul product: {type(other)}."
+        assert self._inner_dims_match_with(other), \
+               f"Cannot multiply {self.shape.row}x{self.shape.col} and {other.shape.row}x{other.shape.col} Matrices. Inner dimensions must match."
     
-        x_rows, y_rows, y_cols = x.shape.row, y.shape.row, y.shape.col
+        x, y = self, other.T()
         out_data = []
         
-        for x_row in range(x_rows):
+        for x_row in x.data:
             out_row = []
 
-            for y_col in range(y_cols):
-                temp_data = 0
+            for y_row in y.data:
+                out_value = Value(0)
 
-                for y_row in range(y_rows):
-                    temp_data += x.data[x_row][y_row] * y.data[y_row][y_col]
+                for x_value, y_value in zip(x_row, y_row):
+                    out_value += x_value * y_value
 
-                out_row.append(temp_data)
+                out_row.append(out_value)
 
             out_data.append(out_row)
                 
@@ -422,23 +418,24 @@ class Matrix:
         
         return out_mat if dim == 1 else out_mat.T()
     
-    def mse(self, target: Matrix, dim: int = 0):
-        in_mat = self if dim == 1 else self.T()
-        out_data = []
+    def MSE(self, target: Matrix, dim: int = 0):
+        input = self if dim == 1 else self.T()
+        assert input._dims_match_with(target), "Cannot perform MSE. Dimensions don't match with target."
         
-        for row in range(in_mat.shape.row):
-            row_sum = Value(0.0)
+        MSE = Value(0)
+        
+        for input_row, target_row in zip(input.data, target.data):
+            row_error_sum = Value(0)
             
-            for col in range(in_mat.shape.col):
-                squared_sub = (target[row][col] - in_mat[row][col]) ** 2
-                row_sum += squared_sub
+            for input_value, target_value in zip(input_row, target_row):
+                squared_error = (target_value - input_value) ** 2
+                row_error_sum += squared_error
                 
-            mse = row_sum / in_mat.shape.col
-            out_data.append(mse)
+            MSE += row_error_sum / input.shape.col
         
-        out_mat = Matrix([out_data])
+        MSE = MSE / input.shape.row
         
-        return out_mat if dim == 1 else out_mat.T()
+        return Matrix([[MSE]])
 
     # Backpropagation
 
@@ -478,6 +475,9 @@ class Matrix:
     
     def _inner_dims_match_with(self, other: Matrix) -> bool:
         return self.shape.col == other.shape.row
+    
+    def _is_square(self) -> bool:
+        return self.shape.row == self.shape.col
 
     def __repr__(self) -> str:
         repr = str("Matrix([")
