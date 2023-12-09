@@ -4,8 +4,9 @@ import math
 import sys
 import os
 sys.path.append(os.curdir + "\..")
+sys.path.append(os.curdir + "\..\minitorch")
 
-from minigrad import Value
+from minitorch.value import Value
 
 class TestBinaryOps(unittest.TestCase):
     def test_add_two_value_objects(self):

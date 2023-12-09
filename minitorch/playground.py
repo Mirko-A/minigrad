@@ -1,4 +1,4 @@
-import minigrad
+from matrix import Matrix
 import torch
 import torch.nn as nn
 import math
@@ -10,21 +10,21 @@ N = 16
 
 a = torch.randn(N, N)
 b = torch.randn(N, N)
-# a = minigrad.Matrix.randn(N, N)
-# b = minigrad.Matrix.randn(N, N)
+# a = Matrix.randn(N, N)
+# b = Matrix.randn(N, N)
 
 for i in range(100):
     c = torch.matmul(a, b)
-    # c = minigrad.Matrix.matmul(a, b)
+    # c = Matrix.matmul(a, b)
 
 print("--- %s seconds ---" % (time.time() - start_time))
 
-# a = minigrad.Matrix.fill(8, 8, 1.0)
-# b = minigrad.Matrix.tril(a)
-# c = minigrad.Matrix.replace(minigrad.Matrix.replace(b, 0.0, -math.inf), 1.0, 0.0)
+# a = Matrix.fill(8, 8, 1.0)
+# b = Matrix.tril(a)
+# c = Matrix.replace(Matrix.replace(b, 0.0, -math.inf), 1.0, 0.0)
 # print(c.softmax(1))
 
-# m = minigrad.Matrix.from_2d_array([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]])
+# m = Matrix.from_2d_array([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]])
 # b = 2.0 * m
 # c = b + m
 # n = c.softmax(0)
@@ -35,15 +35,15 @@ print("--- %s seconds ---" % (time.time() - start_time))
 # print(x)
 # print(m.grad())
 
-# target_mat_0 = minigrad.Matrix.from_2d_array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
-# target_mat_1 = minigrad.Matrix.from_2d_array([[0.0, 1.0], [0.0, 1.0], [1.0, 0.0]])
+# target_mat_0 = Matrix.from_2d_array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0]])
+# target_mat_1 = Matrix.from_2d_array([[0.0, 1.0], [0.0, 1.0], [1.0, 0.0]])
 # ce_0 = n.cross_entropy(target_mat_0, 0)
 # ce_1 = n_1.cross_entropy(target_mat_1, 1)
 
 # print(f'Softmax (0):\n{n}\nCross-entropy (0):\n{ce_0}\n\nSoftmax (1):\n{n_1}\nCross-entropy (1):\n{ce_1}\n')
 
 
-# #n = minigrad.Matrix.from_2d_array([[1.8, -2.1], [-0.3, 0.3]])
+# #n = Matrix.from_2d_array([[1.8, -2.1], [-0.3, 0.3]])
 # n = 2.0 * m
 # a = n.sum(0)
 # b = a.sum()

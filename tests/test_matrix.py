@@ -3,8 +3,9 @@ import unittest
 import sys
 import os
 sys.path.append(os.curdir + "\..")
+sys.path.append(os.curdir + "\..\minitorch")
 
-from minigrad import Matrix
+from minitorch.matrix import Matrix
 
 class TestMatrixGenerationFuncs(unittest.TestCase):
     def test_matrix_fill(self):
