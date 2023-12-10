@@ -1,10 +1,5 @@
 import unittest
 
-import sys
-import os
-sys.path.append(os.curdir + "\..")
-sys.path.append(os.curdir + "\..\minitorch")
-
 from minitorch.matrix import Matrix
 
 class TestMatrixGenerationFuncs(unittest.TestCase):

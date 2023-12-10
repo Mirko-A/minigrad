@@ -1,11 +1,6 @@
 import unittest
 import math
 
-import sys
-import os
-sys.path.append(os.curdir + "\..")
-sys.path.append(os.curdir + "\..\minitorch")
-
 from minitorch.value import Value
 
 class TestBinaryOps(unittest.TestCase):
