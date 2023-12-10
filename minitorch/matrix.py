@@ -37,7 +37,7 @@ class Matrix:
         
         self.data = data
         self._shape = Matrix.Shape(len(data), len(data[0]))
-        
+
     # Static construction methods
 
     @staticmethod
@@ -439,9 +439,9 @@ class Matrix:
 
     # Backpropagation
 
-    def backward(self) -> None:
+    def backward(self, grad: float = 1.0) -> None:
         # TODO: Naive implementation
-        self.data[0][0].backward()
+        self.item().backward(grad)
 
     # Utility
     
@@ -450,8 +450,8 @@ class Matrix:
         return self._shape
     
     # Function returns one of the following:
-    # a) list[list[Value]] -> When row >  1 and col > 1 
-    # b) list[Value]       -> When row == 1 and col > 1
+    # a) list[list[Value]] -> When row >  1 and col >  1 
+    # b) list[Value]       -> When row == 1 and col >  1
     # c) Value             -> When row == 1 and col == 1
     def item(self) -> list[list[Value]] | list[Value] | Value:
         row, col = self.shape.row, self.shape.col
