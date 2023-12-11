@@ -8,8 +8,8 @@ from value import Value
 
 class Matrix:
     class Diagonal(Enum):
-        LOWER = 0
-        UPPER = 1
+        MAIN = 0
+        ANTI = 1
 
     class Shape:
         def __init__(self, row: int, col: int) -> None:
@@ -129,22 +129,44 @@ class Matrix:
         return Matrix(out_data)
     
     @staticmethod
-    def tril(input: Matrix, diagonal: Diagonal = Diagonal.LOWER):
+    def tril(input: Matrix, diagonal: Diagonal = Diagonal.MAIN) -> Matrix:
         assert input._is_square(), "Cannot apply tril to non-square matrices."
         
-        out_data = []
-        tril_cursor = 1
+        def tril_main_diagonal(input: Matrix) -> Matrix:
+            out_data = []
+            tril_cursor = 1
 
-        for row in input.data:
-            out_row = []
+            for row in input.data:
+                out_row = []
 
-            for value_pos, value in enumerate(row):
-                out_row.append(value if value_pos < tril_cursor else Value(0.0))
+                for value_pos, value in enumerate(row):
+                    should_keep_value = value_pos < tril_cursor
+                    out_row.append(value if should_keep_value else Value(0.0))
 
-            out_data.append(out_row)
-            tril_cursor += 1
+                out_data.append(out_row)
+                tril_cursor += 1
+            
+            return Matrix(out_data)
+        
+        def tril_anti_diagonal(input: Matrix) -> Matrix:
+            out_data = []
+            tril_cursor = 0
 
-        return Matrix(out_data)
+            for row in input.data:
+                out_row = []
+
+                for value_pos, value in enumerate(row):
+                    should_replace_value = value_pos < tril_cursor
+                    out_row.append(Value(0.0) if should_replace_value else value)
+
+                out_data.append(out_row)
+                tril_cursor += 1
+            
+            return Matrix(out_data)
+
+        output = tril_main_diagonal(input) if diagonal == Matrix.Diagonal.MAIN else tril_anti_diagonal(input)
+
+        return output
 
     # Operations
 
