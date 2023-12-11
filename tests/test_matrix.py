@@ -36,6 +36,23 @@ class TestMatrixGenerationFuncs(unittest.TestCase):
 
         # Impossible to check random data 
     
+    def test_matrix_masked_fill(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+
+        new = Matrix.masked_fill(old, old == 3.2, 1.7)
+
+        # Check dims
+        self.assertEqual(new.shape.row, 3)
+        self.assertEqual(new.shape.col, 3)
+        
+        # Check data
+        for old_row, new_row in zip(old.data, new.data):
+            for old_value, new_value in zip(old_row, new_row):
+                if old_value.data == 3.2:
+                    self.assertEqual(new_value.data, 1.7)
+
     def test_matrix_replace(self):
         old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
                                     [ 3.2, -3.9, 0.2], 
@@ -52,6 +69,43 @@ class TestMatrixGenerationFuncs(unittest.TestCase):
             for old_value, new_value in zip(old_row, new_row):
                 if old_value.data == 3.2:
                     self.assertEqual(new_value.data, 1.7)
+
+    def test_matrix_masked_tril_main_diagonal(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+
+        new = Matrix.tril(old)
+        expected_new = Matrix.from_2d_array([[ 0.7,  0.0, 0.0], 
+                                             [ 3.2, -3.9, 0.0], 
+                                             [-1.5,  3.2, 3.2]])
+
+        # Check dims
+        self.assertEqual(new.shape.row, 3)
+        self.assertEqual(new.shape.col, 3)
+        
+        # Check data
+        for new_row, expected_new_row in zip(new.data, expected_new.data):
+            for new_value, expected_new_value in zip(new_row, expected_new_row):
+                self.assertAlmostEqual(new_value.data, expected_new_value.data)
+
+    def test_matrix_masked_tril_anti_diagonal(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+
+        new = Matrix.tril(old, Matrix.Diagonal.ANTI)
+        expected_new = Matrix.from_2d_array([[0.7,  3.2, 1.1], 
+                                             [0.0, -3.9, 0.2], 
+                                             [0.0,  0.0, 3.2]])
+        # Check dims
+        self.assertEqual(new.shape.row, 3)
+        self.assertEqual(new.shape.col, 3)
+        
+        # Check data
+        for new_row, expected_new_row in zip(new.data, expected_new.data):
+            for new_value, expected_new_value in zip(new_row, expected_new_row):
+                self.assertAlmostEqual(new_value.data, expected_new_value.data)
 
 class TestBinaryOps(unittest.TestCase):
     def test_matrix_is_equal_to_matrix(self):
