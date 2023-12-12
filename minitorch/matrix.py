@@ -251,8 +251,8 @@ class Matrix:
         return Matrix([out_data])
 
     def sum(self, dim: int | None = None) -> Matrix:
-        VALID_AXIS_VALUES = [None, 0, 1]
-        assert dim in VALID_AXIS_VALUES, "Invalid value for dim provided. Expected: None, 0 or 1."
+        VALID_DIM_VALUES = [None, 0, 1]
+        assert dim in VALID_DIM_VALUES, "Invalid dimension value provided. Expected: None, 0 or 1."
         
         def sum_all(input: Matrix) -> Matrix:
             out_data = Value(0.0)
@@ -404,6 +404,9 @@ class Matrix:
         return Matrix(out_data)
     
     def softmax(self, dim: int = 0):
+        VALID_DIM_VALUES = [0, 1]
+        assert dim in VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
+
         input = self if dim == 1 else self.T()
         input_exp = input.exp()
         input_exp_sums = input_exp.sum(dim=1).item()
@@ -424,21 +427,24 @@ class Matrix:
     # Loss funcs
     
     def cross_entropy(self, target: Matrix, dim: int = 0):
-        in_mat = self if dim == 1 else self.T()
-        in_mat_log = in_mat.log(2.0)
+        VALID_DIM_VALUES = [0, 1]
+        assert dim in VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
+
+        input = self if dim == 1 else self.T()
+        input_log = input.log(2.0)
         out_data = []
         
-        for row in range(in_mat.shape.row):
+        for target_row, input_log_row in zip(target.data, input_log.data):
             row_sum = Value(0.0)
             
-            for col in range(in_mat.shape.col):
-                mul = target[row][col] * in_mat_log[row][col]
+            for target_value, input_log_value in zip(target_row, input_log_row):
+                mul = target_value * input_log_value
                 row_sum += mul
             out_data.append(-row_sum)
             
-        out_mat = Matrix([out_data])
+        output = Matrix([out_data])
         
-        return out_mat if dim == 1 else out_mat.T()
+        return output if dim == 1 else output.T()
     
     def MSE(self, target: Matrix, dim: int = 0):
         input = self if dim == 1 else self.T()
