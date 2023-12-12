@@ -70,7 +70,7 @@ class TestMatrixGenerationFuncs(unittest.TestCase):
                 if old_value.data == 3.2:
                     self.assertEqual(new_value.data, 1.7)
 
-    def test_matrix_masked_tril_main_diagonal(self):
+    def test_matrix_tril_main_diagonal(self):
         old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
                                     [ 3.2, -3.9, 0.2], 
                                     [-1.5,  3.2, 3.2]])
@@ -89,7 +89,7 @@ class TestMatrixGenerationFuncs(unittest.TestCase):
             for new_value, expected_new_value in zip(new_row, expected_new_row):
                 self.assertAlmostEqual(new_value.data, expected_new_value.data)
 
-    def test_matrix_masked_tril_anti_diagonal(self):
+    def test_matrix_tril_anti_diagonal(self):
         old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
                                     [ 3.2, -3.9, 0.2], 
                                     [-1.5,  3.2, 3.2]])
@@ -253,6 +253,72 @@ class TestUnaryOps(unittest.TestCase):
         for row in range(rows):
             for col in range(cols):
                 self.assertAlmostEqual(result[row][col].data, expected_result[row][col].data)
+
+    def test_matrix_flatten(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+        
+        new = old.flatten()
+        expected_new = Matrix.from_1d_array([0.7,  3.2, 1.1, 3.2, -3.9, 0.2, -1.5,  3.2, 3.2])
+
+        # Check dims
+        self.assertEqual(new.shape.row, 1)
+        self.assertEqual(new.shape.col, (old.shape.row * old.shape.col))
+        
+        # Check data
+        for new_row, expected_new_row in zip(new.data, expected_new.data):
+            for new_value, expected_new_value in zip(new_row, expected_new_row):
+                self.assertAlmostEqual(new_value.data, expected_new_value.data)
+
+    def test_matrix_sum_dim_not_specified(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+        
+        result = old.sum()
+        expected_result = sum(*old.flatten().data).data
+
+        # Check dims
+        self.assertEqual(result.shape.row, 1)
+        self.assertEqual(result.shape.col, 1)
+        
+        # Check data
+        self.assertEqual(result.item().data, expected_result)
+
+    def test_matrix_sum_dim_0(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+        
+        result = old.sum(dim=0)
+        expected_result = Matrix.from_1d_array([sum(row).data for row in old.T().data])
+
+        # Check dims
+        self.assertEqual(result.shape.row, 3)
+        self.assertEqual(result.shape.col, 1)
+        
+        # Check data
+        for result_row, expected_result_row in zip(result.data, expected_result.data):
+            for result_value, expected_result_value in zip(result_row, expected_result_row):
+                self.assertAlmostEqual(result_value.data, expected_result_value.data)
+
+    def test_matrix_sum_dim_1(self):
+        old = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                    [ 3.2, -3.9, 0.2], 
+                                    [-1.5,  3.2, 3.2]])
+        
+        result = old.sum(dim=1)
+        expected_result = Matrix.from_1d_array([sum(row).data for row in old.data])
+
+        # Check dims
+        self.assertEqual(result.shape.row, 3)
+        self.assertEqual(result.shape.col, 1)
+        
+        # Check data
+        for result_row, expected_result_row in zip(result.data, expected_result.data):
+            for result_value, expected_result_value in zip(result_row, expected_result_row):
+                self.assertAlmostEqual(result_value.data, expected_result_value.data)
 
 if __name__ == "__main__":
     unittest.main()
