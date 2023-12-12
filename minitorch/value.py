@@ -8,7 +8,7 @@ import math
 #       in the same order.
 
 class Value:
-    def __init__(self, data: float, _children: tuple[Value, Value]=()) -> None:
+    def __init__(self, data: float, _children: tuple[Value, Value] | tuple[Value] | tuple[()] = ()) -> None:
         assert isinstance(data, (float, int)) and not isinstance(data, bool), f"Cannot construct Value object with type: {type(data)}. Expected float."
         if not isinstance(data, float): data = float(data)
 
@@ -36,7 +36,7 @@ class Value:
         
         return out
     
-    def _sub(self, other: Value | float, reverse=False) -> Value:
+    def _sub(self, other: Value | float, reverse: bool = False) -> Value:
         if not isinstance(other, Value): other = Value(other)
         x, y = self, other
         
@@ -76,7 +76,7 @@ class Value:
         
         return out
     
-    def _div(self, other: Value | float, reverse=False) -> Value:
+    def _div(self, other: Value | float, reverse: bool = False) -> Value:
         if not isinstance(other, Value): other = Value(other)
         x, y = self, other
         
@@ -93,7 +93,7 @@ class Value:
 
         return out
 
-    def _pow(self, other: Value | float, reverse=False) -> Value:
+    def _pow(self, other: Value | float, reverse: bool = False) -> Value:
         if not isinstance(other, Value): other = Value(other)
         x, y = self, other
         
@@ -110,7 +110,7 @@ class Value:
 
         return out
     
-    def log(self, base: Value | float = math.e) -> Value:        
+    def log(self, base: Value | float = math.e) -> Value:
         if not isinstance(base, Value): base = Value(base)
         arg = self
         
@@ -148,7 +148,7 @@ class Value:
 
     # Activation funcs
 
-    def sigmoid(self):
+    def sigmoid(self) -> Value:
         def sigmoid_impl(x):
             return 1 / (1 + math.exp(-x))
         
@@ -161,7 +161,7 @@ class Value:
 
         return out
 
-    def relu(self):
+    def relu(self) -> Value:
         out = Value(self.data if self.data > 0 else 0, (self,))
 
         def _backward():
@@ -172,7 +172,7 @@ class Value:
 
         return out
 
-    def tanh(self):
+    def tanh(self) -> Value:
         def tanh_impl(x):
             return (math.exp(2*x) - 1) / (math.exp(2*x) + 1)
         
@@ -187,7 +187,7 @@ class Value:
         
     # Backpropagation
 
-    def backward(self, grad = 1.0) -> None:
+    def backward(self, grad: float = 1.0) -> None:
         self.grad = grad
 
         nodes: list[Value] = []

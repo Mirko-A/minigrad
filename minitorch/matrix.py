@@ -18,7 +18,8 @@ class Matrix:
             self.row = row
             self.col = col
         
-        def __eq__(self, __value: Matrix.Shape) -> bool:
+        def __eq__(self, __value) -> bool:
+            assert isinstance(__value, Matrix.Shape), f"Cannot compare a Shape and a {type(__value)}"
             return self.row == __value.row and self.col == __value.col
             
     # Matrix construction error messages
@@ -168,6 +169,31 @@ class Matrix:
 
         return output
 
+    # Shape manipulation methods
+
+    def T(self) -> Matrix:
+        rows, cols = self.shape.row, self.shape.col
+        out_data = []
+
+        for col_idx in range(cols):
+            out_row = []
+
+            for row_idx in range(rows):
+                out_row.append(self.data[row_idx][col_idx])
+
+            out_data.append(out_row)
+            
+        return Matrix(out_data)
+
+    def flatten(self) -> Matrix:
+        out_data = []
+
+        for row in self.data:
+            for value in row:
+                out_data.append(value)
+
+        return Matrix([out_data])
+
     # Operations
 
     def is_equal_to(self, target: Matrix) -> bool:
@@ -226,29 +252,6 @@ class Matrix:
             out_data.append(out_row)
 
         return Matrix(out_data)
-
-    def T(self) -> Matrix:
-        rows, cols = self.shape.row, self.shape.col
-        out_data = []
-
-        for col_idx in range(cols):
-            out_row = []
-
-            for row_idx in range(rows):
-                out_row.append(self.data[row_idx][col_idx])
-
-            out_data.append(out_row)
-            
-        return Matrix(out_data)
-
-    def flatten(self) -> Matrix:
-        out_data = []
-
-        for row in self.data:
-            for value in row:
-                out_data.append(value)
-
-        return Matrix([out_data])
 
     def sum(self, dim: int | None = None) -> Matrix:
         VALID_DIM_VALUES = [None, 0, 1]
@@ -485,7 +488,7 @@ class Matrix:
         row, col = self.shape.row, self.shape.col
 
         if row > 1 and col > 1:
-            out_data = self.data
+            out_data: list[list[Value]] | list[Value] | Value = self.data
         elif row > 1 and col == 1:
             out_data = [row[0] for row in self.data]
         elif row == 1 and col > 1:
