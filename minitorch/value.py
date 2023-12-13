@@ -13,13 +13,9 @@ class Value:
         if not isinstance(data, float): data = float(data)
 
         self.grad = 0.0
-        self._data = data
+        self.data = data
         self._children = _children
         self._backward = lambda : None
-
-    @property
-    def data(self) -> float:
-        return self._data
 
     # Operations
 

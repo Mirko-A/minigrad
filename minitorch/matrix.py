@@ -466,6 +466,8 @@ class Matrix:
     # Loss funcs
     
     def cross_entropy(self, target: Matrix):
+        assert isinstance(target, Matrix), f"Cannot perform Cross-Entropy on target type {type(target)}"
+        assert self._dims_match_with(target), "Cannot perform Cross-Entropy. Dimensions of input don't match with target."
         # NOTE: PyTorch uses base e here, might be relevant later
         input_log = self.log(2)
         out_data = []
@@ -482,6 +484,7 @@ class Matrix:
         return Matrix([out_data])
     
     def MSE(self, target: Matrix):
+        assert isinstance(target, Matrix), f"Cannot perform MSE on target type {type(target)}"
         assert self._dims_match_with(target), "Cannot perform MSE. Dimensions of input don't match with target."
         
         MSE = []
