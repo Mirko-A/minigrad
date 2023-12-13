@@ -1,4 +1,5 @@
 import unittest
+import math
 
 from minitorch.matrix import Matrix
 
@@ -319,6 +320,199 @@ class TestUnaryOps(unittest.TestCase):
         for result_row, expected_result_row in zip(result.data, expected_result.data):
             for result_value, expected_result_value in zip(result_row, expected_result_row):
                 self.assertAlmostEqual(result_value.data, expected_result_value.data)
+
+    def test_matrix_exp(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.exp()
+
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for input_row, result_row in zip(input.data, result.data):
+            for input_value, result_value in zip(input_row, result_row):
+                self.assertAlmostEqual(input_value.exp().data, result_value.data)
+
+    def test_matrix_log_base_2(self):
+        input = Matrix.from_2d_array([[0.7, 3.2, 1.1], 
+                                      [3.2, 3.9, 0.2], 
+                                      [1.5, 3.2, 3.2]])
+        
+        result = input.log(2)
+
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for input_row, result_row in zip(input.data, result.data):
+            for input_value, result_value in zip(input_row, result_row):
+                self.assertAlmostEqual(input_value.log(2).data, result_value.data)
+
+    def test_matrix_log_base_e(self):
+        input = Matrix.from_2d_array([[0.7, 3.2, 1.1], 
+                                      [3.2, 3.9, 0.2], 
+                                      [1.5, 3.2, 3.2]])
+        
+        result = input.log(math.e)
+
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for input_row, result_row in zip(input.data, result.data):
+            for input_value, result_value in zip(input_row, result_row):
+                self.assertAlmostEqual(input_value.log(math.e).data, result_value.data)
+
+    def test_matrix_sigmoid(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.sigmoid()
+
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for input_row, result_row in zip(input.data, result.data):
+            for input_value, result_value in zip(input_row, result_row):
+                self.assertAlmostEqual(input_value.sigmoid().data, result_value.data)
+
+    def test_matrix_relu(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.relu()
+
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for input_row, result_row in zip(input.data, result.data):
+            for input_value, result_value in zip(input_row, result_row):
+                self.assertAlmostEqual(input_value.relu().data, result_value.data)
+
+    def test_matrix_tanh(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.tanh()
+
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for input_row, result_row in zip(input.data, result.data):
+            for input_value, result_value in zip(input_row, result_row):
+                self.assertAlmostEqual(input_value.tanh().data, result_value.data)
+
+    def test_matrix_softmax_dim_0(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.softmax(dim=0)
+        expected_result = Matrix.from_2d_array([[0.0752258819, 0.4997938080, 0.104463303],
+                                                [0.9164388527, 0.0004123823, 0.0424716097],
+                                                [0.0083352653, 0.4997938088, 0.8530650866]])
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for result_row, expected_row in zip(result.data, expected_result.data):
+            for result_value, expected_value in zip(result_row, expected_row):
+                self.assertAlmostEqual(result_value.data, expected_value.data)
+
+    def test_matrix_softmax_dim_1(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.softmax(dim=1)
+        expected_result = Matrix.from_2d_array([[0.06814626, 0.83019145, 0.101662280],
+                                                [0.951826016, 7.8536e-04, 0.0473886269],
+                                                [4.5271e-03, 0.497736474, 0.4977364744]])
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for result_row, expected_row in zip(result.data, expected_result.data):
+            for result_value, expected_value in zip(result_row, expected_row):
+                self.assertAlmostEqual(result_value.data, expected_value.data)
+
+    def test_matrix_softmax_dim_1(self):
+        input = Matrix.from_2d_array([[ 0.7,  3.2, 1.1], 
+                                      [ 3.2, -3.9, 0.2], 
+                                      [-1.5,  3.2, 3.2]])
+        
+        result = input.softmax(dim=1)
+        expected_result = Matrix.from_2d_array([[0.06814626, 0.83019145, 0.101662280],
+                                                [0.951826016, 7.8536e-04, 0.0473886269],
+                                                [4.5271e-03, 0.497736474, 0.4977364744]])
+        
+        # Check dims
+        self.assertEqual(result.shape.row, input.shape.row)
+        self.assertEqual(result.shape.col, input.shape.col)
+        
+        # Check data
+        for result_row, expected_row in zip(result.data, expected_result.data):
+            for result_value, expected_value in zip(result_row, expected_row):
+                self.assertAlmostEqual(result_value.data, expected_value.data)
+
+    def test_matrix_cross_entropy(self):
+        input = Matrix.from_2d_array([[0.7, 0.2, 0.1], 
+                                      [0.5, 0.25, 0.25], 
+                                      [0.95, 0.01, 0.04]])
+
+        target = Matrix.from_2d_array([[0, 1, 0], 
+                                       [1, 0, 0], 
+                                       [1, 0, 0]])
+        
+        result = input.cross_entropy(target)
+        expected_result = Matrix.from_1d_array([2.321928094, 1.0000, 0.07400058144])
+        
+        # Check dims
+        self.assertEqual(result.shape.row, 1)
+        self.assertEqual(result.shape.col, input.shape.col)
+
+        # Check data
+        for result_row, expected_row in zip(result.data, expected_result.data):
+            for result_value, expected_value in zip(result_row, expected_row):
+                self.assertAlmostEqual(result_value.data, expected_value.data)
+
+    def test_matrix_mse(self):
+        input = Matrix.from_2d_array([[2, 2, 3], 
+                                      [5, 1, 0], 
+                                      [1, 2, 3]])
+
+        target = Matrix.from_2d_array([[0, 1, 0], 
+                                       [1, 0, 0], 
+                                       [1, 0, 0]])
+        
+        result = input.MSE(target)
+        expected_result = Matrix.from_1d_array([4.666666666, 5.666666666, 4.33333333])
+        
+        # Check dims
+        self.assertEqual(result.shape.row, 1)
+        self.assertEqual(result.shape.col, input.shape.col)
+
+        # Check data
+        for result_row, expected_row in zip(result.data, expected_result.data):
+            for result_value, expected_value in zip(result_row, expected_row):
+                self.assertAlmostEqual(result_value.data, expected_value.data)
 
 if __name__ == "__main__":
     unittest.main()
