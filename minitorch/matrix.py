@@ -4,7 +4,7 @@ from random import gauss
 
 import math
 
-from value import Value
+from minitorch.value import Value
 
 class Matrix:
     class Diagonal(Enum):
