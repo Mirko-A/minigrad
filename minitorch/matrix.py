@@ -1,6 +1,6 @@
 from __future__ import annotations
 from enum import Enum
-from random import gauss
+from random import gauss, uniform
 
 import math
 
@@ -27,6 +27,9 @@ class Matrix:
     _row_len_error_message = "Cannot construct Matrix. All rows must have the same length."
     _type_error_message = "Cannot construct Matrix with given arguments. Expected: "
     
+    # Valid dimension values for a Matrix
+    _VALID_DIM_VALUES = [0, 1]
+
     # NOTE: Mirko A. (11/23/2023) 
     # Please do not use the constructor directly outside of the Matrix class.
     # Matrix can be constructed through the following static methods:
@@ -82,6 +85,35 @@ class Matrix:
 
         return Matrix(value_data)
     
+    @staticmethod
+    def cat(matrices: list[Matrix], dim: int = 0) -> Matrix:
+        assert dim in Matrix._VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
+        assert all(isinstance(m, Matrix) for m in matrices), f"Cannot concatenate Matrix with other data types."
+
+        def cat_rows(matrices: list[Matrix]) -> Matrix:
+            rows = matrices[0].shape.row 
+            assert all(m.shape.row == rows for m in matrices)
+
+            out_data = []
+
+            for row in range(rows):
+                out_row = sum((m[row] for m in matrices), [])
+                out_data.append(out_row)
+
+            return Matrix(out_data)
+
+        def cat_cols(matrices: list[Matrix]) -> Matrix:
+            cols = matrices[0].shape.row 
+            assert all(m.shape.col == cols for m in matrices)
+
+            out_data = [row for m in matrices for row in m.data]
+            return Matrix(out_data)
+
+        if dim == 0:
+            return cat_cols(matrices)
+        else:
+            return cat_rows(matrices)
+
     # Static Matrix generation methods
 
     @staticmethod
@@ -97,6 +129,11 @@ class Matrix:
         data = [[gauss(mean, std_dev) for _ in range(cols)] for _ in range(rows)]
         return Matrix.from_2d_array(data)
     
+    @staticmethod
+    def uniform(rows: int, cols: int, low: float, high: float) -> Matrix:
+        data = [[uniform(low, high) for _ in range(cols)] for _ in range(rows)]
+        return Matrix.from_2d_array(data)
+
     @staticmethod
     def masked_fill(input: Matrix, mask: list[list[bool]], new_value: float) -> Matrix:
         assert len(mask) == input.shape.row and                              \
@@ -254,8 +291,7 @@ class Matrix:
         return Matrix(out_data)
 
     def sum(self, dim: int | None = None) -> Matrix:
-        VALID_DIM_VALUES = [None, 0, 1]
-        assert dim in VALID_DIM_VALUES, "Invalid dimension value provided. Expected: None, 0 or 1."
+        assert dim in Matrix._VALID_DIM_VALUES + [None], "Invalid dimension value provided. Expected: None, 0 or 1."
         
         def sum_all(input: Matrix) -> Matrix:
             out_data = Value(0.0)
@@ -407,8 +443,7 @@ class Matrix:
         return Matrix(out_data)
     
     def softmax(self, dim: int = 0):
-        VALID_DIM_VALUES = [0, 1]
-        assert dim in VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
+        assert dim in Matrix._VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
 
         input = self if dim == 1 else self.T()
         input_exp = input.exp()
