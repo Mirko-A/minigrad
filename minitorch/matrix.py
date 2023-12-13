@@ -43,15 +43,15 @@ class Matrix:
 
     @staticmethod
     def from_scalar(data: float) -> Matrix:
-        assert isinstance(data, float), Matrix._type_error_message + "scalar (float)."
+        assert isinstance(data, (float, int)), Matrix._type_error_message + "scalar (float or int)."
         
         return Matrix([[Value(data)]])
     
     @staticmethod
     def from_1d_array(data: list[float]) -> Matrix:
         assert isinstance(data, list) and                          \
-               all(isinstance(value, float) for value in data),    \
-               Matrix._type_error_message + "1D array (float)."
+               all(isinstance(value, (float, int)) for value in data),    \
+               Matrix._type_error_message + "1D array (float or int)."
         assert data, Matrix._empty_list_error_message
         
         _data = []
@@ -65,8 +65,8 @@ class Matrix:
     def from_2d_array(data: list[list[float]]) -> Matrix:
         assert isinstance(data, list) and                                     \
                all(isinstance(row, list) for row in data) and                 \
-               all(all(isinstance(x, float) for x in row) for row in data),   \
-               Matrix._type_error_message + "2D array (float)."
+               all(all(isinstance(x, (float, int)) for x in row) for row in data),   \
+               Matrix._type_error_message + "2D array (float or int)."
         assert all(row for row in data), Matrix._empty_list_error_message
         assert all(len(row) == len(data[0]) for row in data), Matrix._row_len_error_message
 
@@ -298,7 +298,7 @@ class Matrix:
 
         return Matrix(out_data)
     
-    def log(self, base: Value | float = math.e) -> Matrix:
+    def log(self, base: Value | float | int = math.e) -> Matrix:
         out_data = []
 
         for row in self.data:
@@ -421,6 +421,7 @@ class Matrix:
             for value_exp in row_exp:
                 probability = value_exp / row_exp_sum
                 out_row.append(probability)
+
             out_data.append(out_row)
 
         out_mat = Matrix(out_data)
@@ -429,50 +430,44 @@ class Matrix:
 
     # Loss funcs
     
-    def cross_entropy(self, target: Matrix, dim: int = 0):
-        VALID_DIM_VALUES = [0, 1]
-        assert dim in VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
-
-        input = self if dim == 1 else self.T()
-        input_log = input.log(2.0)
+    def cross_entropy(self, target: Matrix):
+        # NOTE: PyTorch uses base e here, might be relevant later
+        input_log = self.log(2)
         out_data = []
         
         for target_row, input_log_row in zip(target.data, input_log.data):
-            row_sum = Value(0.0)
+            cross_entropy_sum = Value(0.0)
             
             for target_value, input_log_value in zip(target_row, input_log_row):
-                mul = target_value * input_log_value
-                row_sum += mul
-            out_data.append(-row_sum)
+                cross_entropy = target_value * input_log_value
+                cross_entropy_sum += cross_entropy
+                
+            out_data.append(-cross_entropy_sum)
             
-        output = Matrix([out_data])
-        
-        return output if dim == 1 else output.T()
+        return Matrix([out_data])
     
-    def MSE(self, target: Matrix, dim: int = 0):
-        input = self if dim == 1 else self.T()
-        assert input._dims_match_with(target), "Cannot perform MSE. Dimensions don't match with target."
+    def MSE(self, target: Matrix):
+        assert self._dims_match_with(target), "Cannot perform MSE. Dimensions of input don't match with target."
         
-        MSE = Value(0)
+        MSE = []
         
-        for input_row, target_row in zip(input.data, target.data):
+        for input_row, target_row in zip(self.data, target.data):
             row_error_sum = Value(0)
             
             for input_value, target_value in zip(input_row, target_row):
                 squared_error = (target_value - input_value) ** 2
                 row_error_sum += squared_error
                 
-            MSE += row_error_sum / input.shape.col
+            MSE.append(row_error_sum / self.shape.col)
         
-        MSE = MSE / input.shape.row
-        
-        return Matrix([[MSE]])
+        return Matrix([MSE])
 
     # Backpropagation
 
     def backward(self, grad: float = 1.0) -> None:
-        # TODO: Naive implementation
-        self.item().backward(grad)
+        data = self.item()
+        assert isinstance(data, Value), f"Cannot call backward on {type(data)}. Expected scalar."
+        data.backward(grad)
 
     # Utility
     

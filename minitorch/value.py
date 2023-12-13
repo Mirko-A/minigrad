@@ -8,7 +8,7 @@ import math
 #       in the same order.
 
 class Value:
-    def __init__(self, data: float, _children: tuple[Value, Value] | tuple[Value] | tuple[()] = ()) -> None:
+    def __init__(self, data: float | int, _children: tuple[Value, Value] | tuple[Value] | tuple[()] = ()) -> None:
         assert isinstance(data, (float, int)) and not isinstance(data, bool), f"Cannot construct Value object with type: {type(data)}. Expected float."
         if not isinstance(data, float): data = float(data)
 
@@ -110,7 +110,7 @@ class Value:
 
         return out
     
-    def log(self, base: Value | float = math.e) -> Value:
+    def log(self, base: Value | float | int = math.e) -> Value:
         if not isinstance(base, Value): base = Value(base)
         arg = self
         
