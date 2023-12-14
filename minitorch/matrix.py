@@ -36,36 +36,37 @@ class Matrix:
     # 1) from_scalar(float)
     # 2) from_1d_array(list[float])
     # 3) from_2d_array(list[list[float]])
-    def __init__(self, data: list[list[Value]]) -> None:
+    def __init__(self, data: list[list[Value]], requires_grad: bool = True) -> None:
         assert all(all(isinstance(x, Value) for x in row) for row in data), "Cannot construct Matrix. Must pass a 2D list of Value objects."
         
         self.data = data
+        self.requires_grad = requires_grad
         self._shape = Matrix.Shape(len(data), len(data[0]))
 
     # Static construction methods
 
     @staticmethod
-    def from_scalar(data: float) -> Matrix:
+    def from_scalar(data: float, requires_grad: bool = True) -> Matrix:
         assert isinstance(data, (float, int)), Matrix._type_error_message + "scalar (float or int)."
         
-        return Matrix([[Value(data)]])
+        return Matrix([[Value(data, requires_grad)]], requires_grad)
     
     @staticmethod
-    def from_1d_array(data: list[float]) -> Matrix:
+    def from_1d_array(data: list[float], requires_grad: bool = True) -> Matrix:
         assert isinstance(data, list) and                          \
                all(isinstance(value, (float, int)) for value in data),    \
                Matrix._type_error_message + "1D array (float or int)."
         assert data, Matrix._empty_list_error_message
         
-        _data = []
+        out_data = []
 
         for x in data:
-            _data.append(Value(x))
+            out_data.append(Value(x, requires_grad))
 
-        return Matrix([_data])
+        return Matrix([out_data], requires_grad)
     
     @staticmethod
-    def from_2d_array(data: list[list[float]]) -> Matrix:
+    def from_2d_array(data: list[list[float]], requires_grad: bool = True) -> Matrix:
         assert isinstance(data, list) and                                     \
                all(isinstance(row, list) for row in data) and                 \
                all(all(isinstance(x, (float, int)) for x in row) for row in data),   \
@@ -73,17 +74,17 @@ class Matrix:
         assert all(row for row in data), Matrix._empty_list_error_message
         assert all(len(row) == len(data[0]) for row in data), Matrix._row_len_error_message
 
-        value_data = []
+        out_data = []
 
         for row in data:
             value_row = []
 
             for x in row:
-                value_row.append(Value(x))
+                value_row.append(Value(x, requires_grad))
 
-            value_data.append(value_row)
+            out_data.append(value_row)
 
-        return Matrix(value_data)
+        return Matrix(out_data, requires_grad)
     
     @staticmethod
     def cat(matrices: list[Matrix], dim: int = 0) -> Matrix:
@@ -91,8 +92,9 @@ class Matrix:
         assert all(isinstance(m, Matrix) for m in matrices), f"Cannot concatenate Matrix with other data types."
 
         def cat_rows(matrices: list[Matrix]) -> Matrix:
-            rows = matrices[0].shape.row 
-            assert all(m.shape.row == rows for m in matrices)
+            rows = matrices[0].shape.row
+            requires_grad = matrices[0].requires_grad
+            assert all(m.shape.row == rows and m.requires_grad == requires_grad for m in matrices)
 
             out_data = []
 
@@ -100,14 +102,15 @@ class Matrix:
                 out_row = sum((m[row] for m in matrices), [])
                 out_data.append(out_row)
 
-            return Matrix(out_data)
+            return Matrix(out_data, requires_grad)
 
         def cat_cols(matrices: list[Matrix]) -> Matrix:
-            cols = matrices[0].shape.row 
-            assert all(m.shape.col == cols for m in matrices)
+            cols = matrices[0].shape.col 
+            requires_grad = matrices[0].requires_grad
+            assert all(m.shape.row == cols and m.requires_grad == requires_grad for m in matrices)
 
             out_data = [row for m in matrices for row in m.data]
-            return Matrix(out_data)
+            return Matrix(out_data, requires_grad)
 
         if dim == 0:
             return cat_cols(matrices)
@@ -117,22 +120,22 @@ class Matrix:
     # Static Matrix generation methods
 
     @staticmethod
-    def fill(rows: int, cols: int, value: float) -> Matrix:
-        return Matrix.from_2d_array([[value] * cols for _ in range(rows)])
+    def fill(rows: int, cols: int, value: float, requires_grad: bool = True) -> Matrix:
+        return Matrix.from_2d_array([[value] * cols for _ in range(rows)], requires_grad)
 
     @staticmethod
-    def zeros(rows: int, cols: int) -> Matrix:
-        return Matrix.fill(rows, cols, 0.0)
+    def zeros(rows: int, cols: int, requires_grad: bool = True) -> Matrix:
+        return Matrix.fill(rows, cols, 0.0, requires_grad)
 
     @staticmethod
-    def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0) -> Matrix:
+    def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = True) -> Matrix:
         data = [[gauss(mean, std_dev) for _ in range(cols)] for _ in range(rows)]
-        return Matrix.from_2d_array(data)
+        return Matrix.from_2d_array(data, requires_grad)
     
     @staticmethod
-    def uniform(rows: int, cols: int, low: float, high: float) -> Matrix:
+    def uniform(rows: int, cols: int, low: float, high: float, requires_grad: bool = True) -> Matrix:
         data = [[uniform(low, high) for _ in range(cols)] for _ in range(rows)]
-        return Matrix.from_2d_array(data)
+        return Matrix.from_2d_array(data, requires_grad)
 
     @staticmethod
     def masked_fill(input: Matrix, mask: list[list[bool]], new_value: float) -> Matrix:
@@ -146,11 +149,11 @@ class Matrix:
             out_data_row = []
 
             for in_data_value, mask_value in zip(in_data_row, mask_row):
-                out_data_row.append(Value(new_value) if mask_value == True else in_data_value)
+                out_data_row.append(Value(new_value, input.requires_grad) if mask_value == True else in_data_value)
 
             out_data.append(out_data_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, input.requires_grad)
         
     @staticmethod
     def replace(input: Matrix, target: float, new: float) -> Matrix:
@@ -160,11 +163,11 @@ class Matrix:
             out_row = []
 
             for value in row:
-                out_row.append(Value(new) if value.data == target else value)
+                out_row.append(Value(new, input.requires_grad) if value.data == target else value)
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, input.requires_grad)
     
     @staticmethod
     def tril(input: Matrix, diagonal: Diagonal = Diagonal.MAIN) -> Matrix:
@@ -179,12 +182,12 @@ class Matrix:
 
                 for value_pos, value in enumerate(row):
                     should_keep_value = value_pos < tril_cursor
-                    out_row.append(value if should_keep_value else Value(0.0))
+                    out_row.append(value if should_keep_value else Value(0.0, input.requires_grad))
 
                 out_data.append(out_row)
                 tril_cursor += 1
             
-            return Matrix(out_data)
+            return Matrix(out_data, input.requires_grad)
         
         def tril_anti_diagonal(input: Matrix) -> Matrix:
             out_data = []
@@ -195,12 +198,12 @@ class Matrix:
 
                 for value_pos, value in enumerate(row):
                     should_replace_value = value_pos < tril_cursor
-                    out_row.append(Value(0.0) if should_replace_value else value)
+                    out_row.append(Value(0.0, input.requires_grad) if should_replace_value else value)
 
                 out_data.append(out_row)
                 tril_cursor += 1
             
-            return Matrix(out_data)
+            return Matrix(out_data, input.requires_grad)
 
         output = tril_main_diagonal(input) if diagonal == Matrix.Diagonal.MAIN else tril_anti_diagonal(input)
 
@@ -220,7 +223,7 @@ class Matrix:
 
             out_data.append(out_row)
             
-        return Matrix(out_data)
+        return Matrix(out_data, self.requires_grad)
 
     def flatten(self) -> Matrix:
         out_data = []
@@ -229,7 +232,7 @@ class Matrix:
             for value in row:
                 out_data.append(value)
 
-        return Matrix([out_data])
+        return Matrix([out_data], self.requires_grad)
 
     # Operations
 
@@ -262,59 +265,60 @@ class Matrix:
         assert isinstance(other, Matrix), f"Cannot add Matrix and {type(other)}."
         assert self._dims_match_with(other), "Cannot add Matrices if shape doesn't match."
 
-        rows, cols = self.shape.row, self.shape.col
+        x, y = self, other
         out_data = []
         
-        for row in range(rows):
+        for x_row, y_row in zip(x.data, y.data):
             out_row = []
 
-            for col in range(cols):
-                out_row.append(self.data[row][col] + other.data[row][col])
+            for x_value, y_value in zip(x_row, y_row):
+                out_row.append(x_value + y_value)
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, x.requires_grad and y.requires_grad)
     
-    def mul(self, other: float) -> Matrix:
-        assert isinstance(other, float), f"Cannot multiply Matrix and {type(other)}."
+    def mul(self, other: float | int) -> Matrix:
+        assert isinstance(other, (float | int)), f"Cannot multiply Matrix and {type(other)}."
 
+        x, y = self, other
         out_data = []
 
-        for row in self.data:
+        for row in x.data:
             out_row = []
 
-            for col in row:
-                out_row.append(col * other)
+            for value in row:
+                out_row.append(value * y)
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, x.requires_grad)
 
     def sum(self, dim: int | None = None) -> Matrix:
         assert dim in Matrix._VALID_DIM_VALUES + [None], "Invalid dimension value provided. Expected: None, 0 or 1."
         
         def sum_all(input: Matrix) -> Matrix:
-            out_data = Value(0.0)
+            out_data = 0
 
             for row in input.data:
                 for value in row:
                     out_data += value
 
-            return Matrix([[out_data]])
+            return Matrix([[out_data]], input.requires_grad)
 
         def sum_along_dim(input: Matrix, dim: int) -> Matrix:
             input = input if dim == 1 else input.T()
             out_data = []
 
             for row in input.data:
-                out_row = Value(0.0)
+                out_row = 0
                 
                 for value in row:
                     out_row += value
 
                 out_data.append([out_row])
 
-            return Matrix(out_data)
+            return Matrix(out_data, input.requires_grad)
 
         if dim is None:
             return sum_all(self)
@@ -332,7 +336,7 @@ class Matrix:
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, self.requires_grad)
     
     def log(self, base: Value | float | int = math.e) -> Matrix:
         out_data = []
@@ -345,7 +349,7 @@ class Matrix:
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, self.requires_grad)
 
     def matmul(self, other: Matrix) -> Matrix:
         assert isinstance(other, Matrix), f"Invalid type for matrix matmul product: {type(other)}."
@@ -359,7 +363,7 @@ class Matrix:
             out_row = []
 
             for y_row in y.data:
-                out_value = Value(0)
+                out_value = 0
 
                 for x_value, y_value in zip(x_row, y_row):
                     out_value += x_value * y_value
@@ -368,7 +372,7 @@ class Matrix:
 
             out_data.append(out_row)
                 
-        return Matrix(out_data)
+        return Matrix(out_data, x.requires_grad and y.requires_grad)
 
     # Operator magic methods
 
@@ -401,46 +405,43 @@ class Matrix:
     # Activation funcs
     
     def sigmoid(self):
-        rows, cols = self.shape.row, self.shape.col
         out_data = []
         
-        for row in range(rows):
+        for row in self.data:
             out_row = []
 
-            for col in range(cols):
-                out_row.append(self.data[row][col].sigmoid())
+            for value in row:
+                out_row.append(value.sigmoid())
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, self.requires_grad)
 
     def relu(self):
-        rows, cols = self.shape.row, self.shape.col
         out_data = []
         
-        for row in range(rows):
+        for row in self.data:
             out_row = []
 
-            for col in range(cols):
-                out_row.append(self.data[row][col].relu())
+            for value in row:
+                out_row.append(value.relu())
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, self.requires_grad)
 
     def tanh(self):
-        rows, cols = self.shape.row, self.shape.col
         out_data = []
         
-        for row in range(rows):
+        for row in self.data:
             out_row = []
 
-            for col in range(cols):
-                out_row.append(self.data[row][col].tanh())
+            for value in row:
+                out_row.append(value.tanh())
 
             out_data.append(out_row)
 
-        return Matrix(out_data)
+        return Matrix(out_data, self.requires_grad)
     
     def softmax(self, dim: int = 0):
         assert dim in Matrix._VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
@@ -459,7 +460,7 @@ class Matrix:
 
             out_data.append(out_row)
 
-        out_mat = Matrix(out_data)
+        out_mat = Matrix(out_data, self.requires_grad)
 
         return out_mat if dim == 1 else out_mat.T()
 
@@ -473,7 +474,7 @@ class Matrix:
         out_data = []
         
         for target_row, input_log_row in zip(target.data, input_log.data):
-            cross_entropy_sum = Value(0.0)
+            cross_entropy_sum = 0
             
             for target_value, input_log_value in zip(target_row, input_log_row):
                 cross_entropy = target_value * input_log_value
@@ -481,7 +482,7 @@ class Matrix:
                 
             out_data.append(-cross_entropy_sum)
             
-        return Matrix([out_data])
+        return Matrix([out_data], self.requires_grad)
     
     def MSE(self, target: Matrix):
         assert isinstance(target, Matrix), f"Cannot perform MSE on target type {type(target)}"
@@ -490,7 +491,7 @@ class Matrix:
         MSE = []
         
         for input_row, target_row in zip(self.data, target.data):
-            row_error_sum = Value(0)
+            row_error_sum = 0
             
             for input_value, target_value in zip(input_row, target_row):
                 squared_error = (target_value - input_value) ** 2
@@ -498,7 +499,7 @@ class Matrix:
                 
             MSE.append(row_error_sum / self.shape.col)
         
-        return Matrix([MSE])
+        return Matrix([MSE], self.requires_grad)
 
     # Backpropagation
 

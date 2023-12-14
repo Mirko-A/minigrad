@@ -16,25 +16,38 @@ class Value:
         self.grad = 0.0
         self.requires_grad = requires_grad
         self._children = _children
-        self._backward = lambda : None
+        self._backward = lambda: None
+        # TODO: DEBUGGING ONLY
+        self.backward_fn: str = ""
 
     # Operations
 
-    def _add(self, other: Value | float) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+    def _add(self, other: Value | float, reverse: bool = False) -> Value:
+        if not isinstance(other, Value): other = Value(other, requires_grad=False)
+        x, y = self, other
 
-        out = Value(self.data + other.data, _children = (self, other))
+        if reverse:
+            x, y = y, x
+
+        out = Value(x.data + y.data, _children = (x, y))
         
-        def _backward():
-            self.grad  += out.grad
-            other.grad += out.grad
+        def add_backward():
+            if x.requires_grad:
+                x.grad  += out.grad
+            else:
+                x.grad = None
+            if y.requires_grad:
+                y.grad += out.grad
+            else:
+                y.grad = None
 
-        out._backward = _backward
+        out._backward = add_backward
+        out.backward_fn = "add"
         
         return out
     
     def _sub(self, other: Value | float, reverse: bool = False) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+        if not isinstance(other, Value): other = Value(other, requires_grad=False)
         x, y = self, other
         
         if reverse:
@@ -42,39 +55,57 @@ class Value:
 
         out = Value(x.data - y.data,  _children = (x, y))
 
-        def _backward():
-            x.grad +=  out.grad
-            y.grad += -out.grad
+        def sub_backward():
+            if x.requires_grad:
+                x.grad +=  out.grad
+            else:
+                x.grad = None
+            if y.requires_grad:
+                y.grad += -out.grad
+            else:
+                y.grad = None
 
-        out._backward = _backward
+        out._backward = sub_backward
+        out.backward_fn = "sub"
         
         return out
     
     def _neg(self) -> Value:
         out = Value(-self.data)
         
-        def _backward():
+        def neg_backward():
             self.grad += -out.grad
 
-        out._backward = _backward
+        out._backward = neg_backward
 
         return out
     
-    def _mul(self, other: Value | float) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+    def _mul(self, other: Value | float, reverse: bool = False) -> Value:
+        if not isinstance(other, Value): other = Value(other, requires_grad=False)
+        x, y = self, other
 
-        out = Value(self.data * other.data, _children = (self, other))
+        if reverse:
+            x, y = y, x
+
+        out = Value(x.data * y.data, _children = (x, y))
         
-        def _backward():
-            self.grad  += out.grad * other.data
-            other.grad += out.grad * self.data
+        def mul_backward():
+            if x.requires_grad:
+                x.grad  += out.grad * y.data
+            else:
+                x.grad = None
+            if y.requires_grad:
+                y.grad += out.grad * x.data
+            else:
+                y.grad = None
 
-        out._backward = _backward
+        out._backward = mul_backward
+        out.backward_fn = "mul"
         
         return out
     
     def _div(self, other: Value | float, reverse: bool = False) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+        if not isinstance(other, Value): other = Value(other, requires_grad=False)
         x, y = self, other
         
         if reverse:
@@ -82,11 +113,18 @@ class Value:
 
         out = Value(x.data / y.data, _children = (x, y))
 
-        def _backward():
-            x.grad += out.grad * 1 / y.data
-            y.grad += out.grad * (-1)*(x.data / (y.data ** 2))
+        def div_backward():
+            if x.requires_grad:
+                x.grad += out.grad * 1 / y.data
+            else:
+                x.grad = None
+            if y.requires_grad:
+                y.grad += out.grad * (-1)*(x.data / (y.data ** 2))
+            else:
+                y.grad = None
 
-        out._backward = _backward
+        out._backward = div_backward
+        out.backward_fn = "div"
 
         return out
 
@@ -99,28 +137,39 @@ class Value:
 
         out = Value(x.data ** y.data, _children = (x, y))
         
-        def _backward():
-            x.grad += out.grad * (y.data * (x.data ** (y.data - 1)))
+        def pow_backward():
+            if x.requires_grad:
+                x.grad += out.grad * (y.data * (x.data ** (y.data - 1)))
+            else:
+                x.grad = None
             if y.requires_grad:
                 y.grad += out.grad * ((x.data ** y.data) * math.log(x.data))
             else:
                 y.grad = None
                 
-        out._backward = _backward
+        out._backward = pow_backward
+        out.backward_fn = "pow"
 
         return out
     
     def log(self, base: Value | float | int = math.e) -> Value:
-        if not isinstance(base, Value): base = Value(base)
+        if not isinstance(base, Value): base = Value(base, requires_grad=False)
         arg = self
         
         out = Value(math.log(self.data, base.data), _children = (arg, ))
         
-        def _backward():
-            arg.grad += out.grad * (1 / (arg.data * math.log(base.data)))
-            base.grad += out.grad * (-(math.log(arg.data) / (base.data * math.log(base.data) ** 2)))
-            
-        out._backward = _backward
+        def log_backward():
+            if arg.requires_grad:
+                arg.grad += out.grad * (1 / (arg.data * math.log(base.data)))
+            else:
+                arg.grad = None
+            if base.requires_grad:
+                base.grad += out.grad * (-(math.log(arg.data) / (base.data * math.log(base.data) ** 2)))
+            else:
+                base.grad = None
+
+        out._backward = log_backward
+        out.backward_fn = "log"
         
         return out
 
@@ -130,7 +179,7 @@ class Value:
     # Operator magic methods
 
     def __add__(self, other): return self._add(other)
-    def __radd__(self, other): return self._add(other)
+    def __radd__(self, other): return self._add(other, True)
     
     def __sub__(self, other): return self._sub(other)
     def __rsub__(self, other): return self._sub(other, True)
@@ -138,7 +187,7 @@ class Value:
     def __neg__(self): return self._neg()
 
     def __mul__(self, other): return self._mul(other)
-    def __rmul__(self, other): return self._mul(other)
+    def __rmul__(self, other): return self._mul(other, True)
     
     def __truediv__(self, other): return self._div(other)
     def __rtruediv__(self, other): return self._div(other, True)
@@ -154,21 +203,21 @@ class Value:
         
         out = Value(sigmoid_impl(self.data), _children = (self, ))
 
-        def _backward():
+        def sigmoid_backward():
             self.grad += out.grad * (sigmoid_impl(self.data) * (1 - sigmoid_impl(self.data)))
 
-        out._backward = _backward
+        out._backward = sigmoid_backward
 
         return out
 
     def relu(self) -> Value:
         out = Value(self.data if self.data > 0 else 0, _children = (self, ))
 
-        def _backward():
+        def relu_backward():
             relu_deriv = 1 if self.data > 0 else 0
             self.grad += out.grad * relu_deriv
 
-        out._backward = _backward
+        out._backward = relu_backward
 
         return out
 
@@ -178,10 +227,10 @@ class Value:
         
         out = Value(tanh_impl(self.data), _children = (self, ))
         
-        def _backward():
+        def tanh_backward():
             self.grad += out.grad * (1 - tanh_impl(self.data) ** 2)
         
-        out._backward = _backward
+        out._backward = tanh_backward
         
         return out
         
