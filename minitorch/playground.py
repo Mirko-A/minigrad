@@ -1,17 +1,16 @@
-from matrix import Matrix
+from minitorch.matrix import Matrix
 import torch
 import torch.nn as nn
 import math
 import time
+import random
 
-m = Matrix.from_2d_array([[43.6, 44.4, 45.2, 46.0, 46.8], [32.4, 31.9, 28.6, 39.1, 40.2], [40.8, 52.1, 33.8, 51.7, 60.3]])
-target_1 = Matrix.from_2d_array([[41.0, 30.0, 42.0], [45.0, 35.0, 50.0], [49.0, 28.0, 35.0], [47.0, 37.0, 54.0], [44.0, 39.0, 59.0]])
-target_2 = Matrix.from_2d_array([[41.0, 45.0, 49.0, 47.0, 44.0], [30.0, 35.0, 28.0, 37.0, 39.0], [42.0, 50.0, 35.0, 54.0, 59.0]])
+# m = Matrix.from_2d_array([[43.6, 44.4, 45.2, 46.0, 46.8], [32.4, 31.9, 28.6, 39.1, 40.2], [40.8, 52.1, 33.8, 51.7, 60.3]])
+# target = Matrix.from_2d_array([[41.0, 45.0, 49.0, 47.0, 44.0], [30.0, 35.0, 28.0, 37.0, 39.0], [42.0, 50.0, 35.0, 54.0, 59.0]])
 
-mse_1 = m.mse(target_1)
-mse_2 = m.mse(target_2, 1)
+# mse = m.MSE(target)
 
-print(f'MSE 1:\n{mse_1}\n\nMSE 2:\n{mse_2}')
+# print(f'MSE 1:\n{mse}\n')
 
 # start_time = time.time()
 
@@ -66,7 +65,6 @@ print(f'MSE 1:\n{mse_1}\n\nMSE 2:\n{mse_2}')
 #     for value in row:
 #         print(value.grad)
 
-# m_pt = torch.tensor([[0.7, 2.1], [0.2, 4.1], [2.3, 1.7]]); m_pt.requires_grad = True
 #print(torch.tril(m_pt))
 # b_pt = 2 * m_pt
 # c_pt = b_pt + m_pt
@@ -101,4 +99,31 @@ print(f'MSE 1:\n{mse_1}\n\nMSE 2:\n{mse_2}')
 
 # print(type(True))
 
+from minitorch.nn.linear import Linear
+from minitorch.nn.optim import SGD
 
+random.seed(10)
+m1 = Matrix.from_1d_array([1, 2, 3, 4])
+m2 = Matrix.from_2d_array([[5, 6], 
+                           [7, 8]])
+
+l0 = Linear(4, 2)
+l1 = Linear(2, 1)
+
+all_params = Matrix.cat([l0.parameters(), l1.parameters()], 1)
+sgd = SGD(all_params, 0.005)
+
+for i in range(30):
+    x0 = l0(m1)
+    x1 = l1(x0)
+    print(x1)
+    loss = x1.MSE(Matrix.from_scalar(2.7))
+    print(f"Loss: {loss.item()}")
+    loss.backward()
+    sgd.step()
+    sgd.zero_grad()
+
+#x0 = l0.forward(m1)
+#x1 = l1.forward(x0)
+#x2 = l2.forward(x1)
+#print(x2)

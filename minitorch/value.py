@@ -8,12 +8,13 @@ import math
 #       in the same order.
 
 class Value:
-    def __init__(self, data: float | int, _children: tuple[Value, Value] | tuple[Value] | tuple[()] = ()) -> None:
+    def __init__(self, data: float | int, requires_grad: bool = True, _children: tuple[Value, Value] | tuple[Value] | tuple[()] = ()) -> None:
         assert isinstance(data, (float, int)) and not isinstance(data, bool), f"Cannot construct Value object with type: {type(data)}. Expected float."
         if not isinstance(data, float): data = float(data)
 
-        self.grad = 0.0
         self.data = data
+        self.grad = 0.0
+        self.requires_grad = requires_grad
         self._children = _children
         self._backward = lambda : None
 
@@ -22,7 +23,7 @@ class Value:
     def _add(self, other: Value | float) -> Value:
         if not isinstance(other, Value): other = Value(other)
 
-        out = Value(self.data + other.data, (self, other))
+        out = Value(self.data + other.data, _children = (self, other))
         
         def _backward():
             self.grad  += out.grad
@@ -39,7 +40,7 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data - y.data, (x, y))
+        out = Value(x.data - y.data,  _children = (x, y))
 
         def _backward():
             x.grad +=  out.grad
@@ -62,7 +63,7 @@ class Value:
     def _mul(self, other: Value | float) -> Value:
         if not isinstance(other, Value): other = Value(other)
 
-        out = Value(self.data * other.data, (self, other))
+        out = Value(self.data * other.data, _children = (self, other))
         
         def _backward():
             self.grad  += out.grad * other.data
@@ -79,7 +80,7 @@ class Value:
         if reverse:
             x, y = y, x
 
-        out = Value(x.data / y.data, (x, y))
+        out = Value(x.data / y.data, _children = (x, y))
 
         def _backward():
             x.grad += out.grad * 1 / y.data
@@ -90,18 +91,21 @@ class Value:
         return out
 
     def _pow(self, other: Value | float, reverse: bool = False) -> Value:
-        if not isinstance(other, Value): other = Value(other)
+        if not isinstance(other, Value): other = Value(other, requires_grad=False)
         x, y = self, other
         
         if reverse:
             x, y = y, x
 
-        out = Value(x.data ** y.data, (x, y))
+        out = Value(x.data ** y.data, _children = (x, y))
         
         def _backward():
             x.grad += out.grad * (y.data * (x.data ** (y.data - 1)))
-            y.grad += out.grad * ((x.data ** y.data) * math.log(x.data))
-
+            if y.requires_grad:
+                y.grad += out.grad * ((x.data ** y.data) * math.log(x.data))
+            else:
+                y.grad = None
+                
         out._backward = _backward
 
         return out
@@ -110,7 +114,7 @@ class Value:
         if not isinstance(base, Value): base = Value(base)
         arg = self
         
-        out = Value(math.log(self.data, base.data))
+        out = Value(math.log(self.data, base.data), _children = (arg, ))
         
         def _backward():
             arg.grad += out.grad * (1 / (arg.data * math.log(base.data)))
@@ -148,7 +152,7 @@ class Value:
         def sigmoid_impl(x):
             return 1 / (1 + math.exp(-x))
         
-        out = Value(sigmoid_impl(self.data), (self,))
+        out = Value(sigmoid_impl(self.data), _children = (self, ))
 
         def _backward():
             self.grad += out.grad * (sigmoid_impl(self.data) * (1 - sigmoid_impl(self.data)))
@@ -158,7 +162,7 @@ class Value:
         return out
 
     def relu(self) -> Value:
-        out = Value(self.data if self.data > 0 else 0, (self,))
+        out = Value(self.data if self.data > 0 else 0, _children = (self, ))
 
         def _backward():
             relu_deriv = 1 if self.data > 0 else 0
@@ -172,7 +176,7 @@ class Value:
         def tanh_impl(x):
             return (math.exp(2*x) - 1) / (math.exp(2*x) + 1)
         
-        out = Value(tanh_impl(self.data), (self,))
+        out = Value(tanh_impl(self.data), _children = (self, ))
         
         def _backward():
             self.grad += out.grad * (1 - tanh_impl(self.data) ** 2)
