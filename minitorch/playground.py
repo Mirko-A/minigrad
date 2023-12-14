@@ -103,27 +103,36 @@ from minitorch.nn.linear import Linear
 from minitorch.nn.optim import SGD
 
 random.seed(10)
-m1 = Matrix.from_1d_array([1, 2, 3, 4])
-m2 = Matrix.from_2d_array([[5, 6], 
-                           [7, 8]])
+input = [[0, 0],
+         [0, 1],
+         [1, 0],
+         [1, 1]]
+target = [0, 0, 0, 1]
 
-l0 = Linear(4, 2)
-l1 = Linear(2, 1)
+l1 = Linear(2, 16)
+l2 = Linear(16, 1)
+all_params = Matrix.cat([l1.parameters(), l2.parameters()], dim=1)
 
-all_params = Matrix.cat([l0.parameters(), l1.parameters()], 1)
 sgd = SGD(all_params, 0.005)
 
-for i in range(30):
-    x0 = l0(m1)
-    x1 = l1(x0)
-    print(x1)
-    loss = x1.MSE(Matrix.from_scalar(2.7))
-    print(f"Loss: {loss.item()}")
+for epoch in range(500):
+    loss = Matrix.from_scalar(0)
+    for in_batch, target_batch in zip(input, target):
+        x = l1(Matrix.from_1d_array(in_batch, False))
+        pred = l2(x)
+        pred = pred.relu()
+        #print(f"Input: {in_batch}")
+        #print(f"Pred: {pred}, expected: {target_batch}")
+        loss += pred.MSE(Matrix.from_scalar(target_batch))
+        #print(f"Input: {in_batch}")
+        #print(f"Pred: {pred}, expected: {target_batch}")
+
+    #print(f"Loss: {loss.item()}")
     loss.backward()
     sgd.step()
     sgd.zero_grad()
 
-#x0 = l0.forward(m1)
-#x1 = l1.forward(x0)
-#x2 = l2.forward(x1)
-#print(x2)
+x = l1(Matrix.from_1d_array([0, 1], False))
+pred = l2(x)
+pred = pred.relu()
+print(pred)

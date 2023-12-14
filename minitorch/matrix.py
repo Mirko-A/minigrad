@@ -276,7 +276,7 @@ class Matrix:
 
             out_data.append(out_row)
 
-        return Matrix(out_data, x.requires_grad and y.requires_grad)
+        return Matrix(out_data, x.requires_grad or y.requires_grad)
     
     def mul(self, other: float | int) -> Matrix:
         assert isinstance(other, (float | int)), f"Cannot multiply Matrix and {type(other)}."
@@ -372,7 +372,7 @@ class Matrix:
 
             out_data.append(out_row)
                 
-        return Matrix(out_data, x.requires_grad and y.requires_grad)
+        return Matrix(out_data, self.requires_grad or other.requires_grad)
 
     # Operator magic methods
 
