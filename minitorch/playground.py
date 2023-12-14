@@ -109,30 +109,28 @@ input = [[0, 0],
          [1, 1]]
 target = [0, 0, 0, 1]
 
-l1 = Linear(2, 16)
-l2 = Linear(16, 1)
+l1 = Linear(2, 8)
+l2 = Linear(8, 1)
 all_params = Matrix.cat([l1.parameters(), l2.parameters()], dim=1)
 
-sgd = SGD(all_params, 0.005)
+sgd = SGD(all_params, 5.0)
 
 for epoch in range(500):
     loss = Matrix.from_scalar(0)
     for in_batch, target_batch in zip(input, target):
         x = l1(Matrix.from_1d_array(in_batch, False))
         pred = l2(x)
-        pred = pred.relu()
-        #print(f"Input: {in_batch}")
-        #print(f"Pred: {pred}, expected: {target_batch}")
+        pred = pred.sigmoid()
         loss += pred.MSE(Matrix.from_scalar(target_batch))
-        #print(f"Input: {in_batch}")
-        #print(f"Pred: {pred}, expected: {target_batch}")
+        print(f"Input: {in_batch}")
+        print(f"Pred: {pred}, expected: {target_batch}")
 
-    #print(f"Loss: {loss.item()}")
+    print(f"Loss: {loss.item()}")
     loss.backward()
     sgd.step()
     sgd.zero_grad()
 
-x = l1(Matrix.from_1d_array([0, 1], False))
-pred = l2(x)
-pred = pred.relu()
-print(pred)
+# x = l1(Matrix.from_1d_array([1, 1], False))
+# pred = l2(x)
+# pred = pred.sigmoid()
+# print(pred)
