@@ -402,7 +402,7 @@ class Matrix:
     def __getitem__(self, key) -> list[Value]:
         return self.data[key]
 
-    # Activation funcs
+    # Activation functions
     
     def sigmoid(self):
         out_data = []
@@ -464,7 +464,7 @@ class Matrix:
 
         return out_mat if dim == 1 else out_mat.T()
 
-    # Loss funcs
+    # Cost functions
     
     def cross_entropy(self, target: Matrix):
         assert isinstance(target, Matrix), f"Cannot perform Cross-Entropy on target type {type(target)}"
