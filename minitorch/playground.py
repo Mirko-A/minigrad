@@ -101,6 +101,7 @@ import random
 
 from minitorch.nn.linear import Linear
 from minitorch.nn.optim import SGD
+from minitorch.ops import Sigmoid, MSELoss
 
 random.seed(10)
 input = [[0, 0],
@@ -114,16 +115,24 @@ l2 = Linear(8, 1)
 all_params = Matrix.cat([l1.parameters(), l2.parameters()], dim=1)
 
 sgd = SGD(all_params, 5.0)
+sig = Sigmoid()
+mse = MSELoss()
 
 for epoch in range(500):
     loss = Matrix.from_scalar(0)
     for in_batch, target_batch in zip(input, target):
+        # x = l1(Matrix.from_1d_array(in_batch, False))
+        # x = x.sigmoid()
+        # x = l2(x)
+        # pred = x.sigmoid()
+        # loss += pred.MSE(Matrix.from_scalar(target_batch))
         x = l1(Matrix.from_1d_array(in_batch, False))
-        pred = l2(x)
-        pred = pred.sigmoid()
-        loss += pred.MSE(Matrix.from_scalar(target_batch))
-        print(f"Input: {in_batch}")
-        print(f"Pred: {pred}, expected: {target_batch}")
+        x = sig(x)
+        x = l2(x)
+        pred = sig(x)
+        loss += mse(pred, Matrix.from_scalar(target_batch))
+        #print(f"Input: {in_batch}")
+        #print(f"Pred: {pred}, expected: {target_batch}")
 
     print(f"Loss: {loss.item()}")
     loss.backward()
@@ -134,3 +143,7 @@ for epoch in range(500):
 # pred = l2(x)
 # pred = pred.sigmoid()
 # print(pred)
+
+# from torch.nn import MultiheadAttention
+
+# m = MultiheadAttention()
