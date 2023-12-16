@@ -22,7 +22,7 @@ class SGD(Optimizer):
     def step(self) -> None:
         for p in self.parameters:
             p.data -= p.grad * self.learning_rate
-            
+                
 class Adam(Optimizer):
     def __init__(self, parameters: Matrix, learning_rate: float, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-08) -> None:
         super().__init__(parameters, learning_rate)

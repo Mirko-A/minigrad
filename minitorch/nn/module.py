@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from minitorch.matrix import Matrix
 
-class Module:
+class Module(ABC):
     @abstractmethod
     def forward(self, input: Matrix) -> Matrix:
         ...

@@ -1,9 +1,11 @@
 from minitorch.nn.module import Module
+from minitorch.ops import Function
 from minitorch.matrix import Matrix
 
 class Sequence(Module):
-    def __init__(self, *args) -> None:
-        self.components = args
+    def __init__(self, *components: Module | Function) -> None:
+        self.components = components
+        self._parameters = self.get_components_params()
         
     def forward(self, input: Matrix) -> Matrix:
         next_input = input
@@ -15,6 +17,9 @@ class Sequence(Module):
         return next_input
     
     def parameters(self) -> Matrix:
+        return self._parameters
+        
+    def get_components_params(self) -> Matrix:
         params = []
         
         for component in self.components:

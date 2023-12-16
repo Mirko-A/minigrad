@@ -125,7 +125,7 @@ adam = Adam(all_params, 0.1)
 sig = Sigmoid()
 mse = MSELoss()
 
-for epoch in range(50):
+for epoch in range(51):
     loss = Matrix.from_scalar(0)
     for in_batch, target_batch in zip(input, target):
         input_mat = Matrix.from_1d_array(in_batch, False)
