@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import Any
 
 from minitorch.matrix import Matrix
 
@@ -9,7 +10,11 @@ from minitorch.matrix import Matrix
 
 class Function(ABC):
     @abstractmethod
-    def forward(self) -> Matrix:
+    def forward(self, *args) -> Matrix:
+        ...
+
+    @abstractmethod
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
         ...
 
 # Activation functions
