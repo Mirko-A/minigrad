@@ -128,6 +128,12 @@ class Matrix:
         return Matrix.fill(rows, cols, 0.0, requires_grad)
 
     @staticmethod
+    def one_hot(hot_index: int, num_classes: int, requires_grad: bool = True) -> Matrix:
+        mask = [False]*num_classes
+        mask[hot_index] = True
+        return Matrix.masked_fill(Matrix.zeros(1, num_classes, requires_grad), [mask], 1.0)
+
+    @staticmethod
     def randn(rows: int, cols: int, mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = True) -> Matrix:
         data = [[gauss(mean, std_dev) for _ in range(cols)] for _ in range(rows)]
         return Matrix.from_2d_array(data, requires_grad)
