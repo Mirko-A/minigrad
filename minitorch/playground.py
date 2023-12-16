@@ -116,7 +116,7 @@ seq = Sequence(
         Sigmoid(),
         Linear(8, 1),
         Sigmoid())
-all_params = seq.get_params()
+all_params = seq.parameters()
 print(f"Second Linear weights: {seq.get_component(2).weights}\n")
 print(seq)
 

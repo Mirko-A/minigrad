@@ -14,7 +14,7 @@ class Sequence(Module):
         
         return next_input
     
-    def get_params(self) -> Matrix:
+    def parameters(self) -> Matrix:
         params = []
         
         for component in self.components:
