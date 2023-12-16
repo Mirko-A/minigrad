@@ -102,6 +102,7 @@ import random
 from minitorch.nn.linear import Linear
 from minitorch.nn.optim import SGD
 from minitorch.ops import Sigmoid, MSELoss
+from minitorch.nn.sequence import Sequence
 
 random.seed(10)
 input = [[0, 0],
@@ -110,31 +111,29 @@ input = [[0, 0],
          [1, 1]]
 target = [0, 0, 0, 1]
 
-l1 = Linear(2, 8)
-l2 = Linear(8, 1)
-all_params = Matrix.cat([l1.parameters(), l2.parameters()], dim=1)
+seq = Sequence(
+        Linear(2, 8),
+        Sigmoid(),
+        Linear(8, 1),
+        Sigmoid())
+all_params = seq.get_params()
+print(f"Second Linear weights: {seq.get_component(2).weights}\n")
+print(seq)
 
-sgd = SGD(all_params, 5.0)
+sgd = SGD(all_params, 2.5)
 sig = Sigmoid()
 mse = MSELoss()
 
-for epoch in range(500):
+for epoch in range(100):
     loss = Matrix.from_scalar(0)
     for in_batch, target_batch in zip(input, target):
-        # x = l1(Matrix.from_1d_array(in_batch, False))
-        # x = x.sigmoid()
-        # x = l2(x)
-        # pred = x.sigmoid()
-        # loss += pred.MSE(Matrix.from_scalar(target_batch))
-        x = l1(Matrix.from_1d_array(in_batch, False))
-        x = sig(x)
-        x = l2(x)
-        pred = sig(x)
+        input_mat = Matrix.from_1d_array(in_batch, False)
+        pred = seq(input_mat)
         loss += mse(pred, Matrix.from_scalar(target_batch))
-        #print(f"Input: {in_batch}")
-        #print(f"Pred: {pred}, expected: {target_batch}")
+        # print(f"Input: {in_batch}")
+        # print(f"Pred: {pred}, expected: {target_batch}")
 
-    print(f"Loss: {loss.item()}")
+    if epoch % 10 == 0: print(f"Epoch {epoch} loss: {loss.item().data:.5f}")
     loss.backward()
     sgd.step()
     sgd.zero_grad()

@@ -9,6 +9,9 @@ class Linear(Module):
         k = 1/in_features
         sqrt_k = math.sqrt(k)
 
+        self.in_features = in_features
+        self.out_features = out_features
+        self.need_bias = need_bias
         self.weights = Matrix.uniform(in_features, out_features, -sqrt_k, sqrt_k)
         self.bias = Matrix.uniform(1, out_features, -sqrt_k, sqrt_k) if need_bias else None
 
