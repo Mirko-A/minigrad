@@ -100,7 +100,7 @@ import random
 # print(type(True))
 
 from minitorch.nn.linear import Linear
-from minitorch.nn.optim import SGD
+from minitorch.nn.optim import SGD, Adam
 from minitorch.ops import Sigmoid, MSELoss
 from minitorch.nn.sequence import Sequence
 
@@ -117,14 +117,15 @@ seq = Sequence(
         Linear(8, 1),
         Sigmoid())
 all_params = seq.parameters()
-print(f"Second Linear weights: {seq.get_component(2).weights}\n")
-print(seq)
+# print(f"Second Linear weights: {seq.get_component(2).weights}\n")
+# print(seq)
 
-sgd = SGD(all_params, 2.5)
+sgd = SGD(all_params, 3.5)
+adam = Adam(all_params, 0.1)
 sig = Sigmoid()
 mse = MSELoss()
 
-for epoch in range(100):
+for epoch in range(50):
     loss = Matrix.from_scalar(0)
     for in_batch, target_batch in zip(input, target):
         input_mat = Matrix.from_1d_array(in_batch, False)
@@ -135,8 +136,8 @@ for epoch in range(100):
 
     if epoch % 10 == 0: print(f"Epoch {epoch} loss: {loss.item().data:.5f}")
     loss.backward()
-    sgd.step()
-    sgd.zero_grad()
+    adam.step()
+    adam.zero_grad()
 
 # x = l1(Matrix.from_1d_array([1, 1], False))
 # pred = l2(x)
