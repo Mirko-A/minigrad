@@ -100,50 +100,19 @@ import random
 # print(type(True))
 
 from minitorch.nn.linear import Linear
-from minitorch.nn.optim import SGD, Adam
-from minitorch.ops import Sigmoid, MSELoss
-from minitorch.nn.sequence import Sequence
+from minitorch.nn.optim import SGD
+from minitorch.matrix import Matrix
 
-random.seed(10)
-input = [[0, 0],
-         [0, 1],
-         [1, 0],
-         [1, 1]]
-target = [0, 0, 0, 1]
+def main():
+    a = Matrix([3, 5], requires_grad=True)
+    b = Matrix([[2, 3, 1],
+                [1, 2, 0]])
 
-seq = Sequence(
-        Linear(2, 8),
-        Sigmoid(),
-        Linear(8, 1),
-        Sigmoid())
-all_params = seq.parameters()
-# print(f"Second Linear weights: {seq.get_component(2).weights}\n")
-# print(seq)
+    print(a)
+    print(b)
+    c = a @ b
+    print(c)
+    
 
-sgd = SGD(all_params, 3.5)
-adam = Adam(all_params, 0.1)
-sig = Sigmoid()
-mse = MSELoss()
-
-for epoch in range(51):
-    loss = Matrix.from_scalar(0)
-    for in_batch, target_batch in zip(input, target):
-        input_mat = Matrix.from_1d_array(in_batch, False)
-        pred = seq(input_mat)
-        loss += mse(pred, Matrix.from_scalar(target_batch))
-        # print(f"Input: {in_batch}")
-        # print(f"Pred: {pred}, expected: {target_batch}")
-
-    if epoch % 10 == 0: print(f"Epoch {epoch} loss: {loss.item().data:.5f}")
-    loss.backward()
-    adam.step()
-    adam.zero_grad()
-
-# x = l1(Matrix.from_1d_array([1, 1], False))
-# pred = l2(x)
-# pred = pred.sigmoid()
-# print(pred)
-
-# from torch.nn import MultiheadAttention
-
-# m = MultiheadAttention()
+if __name__ == "__main__":
+    main()
