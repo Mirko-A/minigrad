@@ -52,7 +52,7 @@ class Matrix:
         self.requires_grad = requires_grad
         self.grad: Optional[Matrix] = None
         # Internal variable used for autograd graph construction
-        self._ctx: Optional[Matrix] = None
+        self._ctx: Optional[Function] = None
 
     @staticmethod
     def _get_data_and_shape(data: int | float | list[int] | list[float] | list[list[int]] | list[list[float]] | MiniBuffer) -> tuple[MiniBuffer, Shape]:
@@ -129,23 +129,15 @@ class Matrix:
         
         return ops.Sub.apply(x, y)
 
-    def mul(self, other: Matrix, reverse: bool = False) -> Matrix:
+    def mul(self, other: Matrix) -> Matrix:
         assert other.is_scalar(), f"Cannot perform Matrix and scalar multiplication. Expected scalar, got {other.shape}."
-        x, y = self, other 
-        
-        if reverse:
-            x, y = y, x
 
-        return ops.Mul.apply(x, y)
+        return ops.Mul.apply(self, other)
     
-    def div(self, other: Matrix, reverse: bool = False) -> Matrix:
+    def div(self, other: Matrix) -> Matrix:
         assert other.is_scalar(), f"Cannot perform Matrix and scalar division. Expected scalar, got {other.shape}."
-        x, y = self, other 
-        
-        if reverse:
-            x, y = y, x
 
-        return ops.Div.apply(x, y)
+        return ops.Div.apply(self, other)
 
     def dot(self, other: Matrix) -> Matrix:
         x, y = self, other.T()
@@ -180,6 +172,43 @@ class Matrix:
     
     # Cost functions
     # TODO: Implement MSE, cross_entropy
+
+    # Backpropagation
+    # NOTE: Mirko A.
+    # I did not understand this fully, go back and figure it out 
+    def deepwalk(self):
+        def _deepwalk(node: Matrix, visited: set[Matrix], nodes: list[Matrix]):
+            visited.add(node)
+
+            if getattr(node, "_ctx", None):
+                for parent in node._ctx.parents:
+                    if parent not in visited: 
+                        _deepwalk(parent, visited, nodes)
+
+                nodes.append(node)
+
+            return nodes
+      
+        return _deepwalk(self, set(), [])
+
+    def backward(self):
+        assert self.is_scalar(), f"Backward can only be called for scalar tensors, but it has shape {self.shape})"
+
+        self.grad = Matrix(1, requires_grad=False)
+
+        for node in reversed(self.deepwalk()):
+            assert node.grad is not None
+
+            grads = node._ctx.backward(node.grad.data)
+            grads = [Matrix(g, requires_grad=False) if g is not None else None
+                        for g in ([grads] if len(node._ctx.parents) == 1 else grads)]
+            
+            for parent, grad in zip(node._ctx.parents, grads):
+                if grad is not None and parent.requires_grad:
+                    assert grad.shape == parent.shape, f"Grad shape must match Matrix shape, {grad.shape} != {parent.shape}"
+                    parent.grad = grad if parent.grad is None else (parent.grad + grad)
+            
+            del node._ctx
 
     # Operator magic methods
 
@@ -217,7 +246,7 @@ class Matrix:
         if not isinstance(other, Matrix):
             other = Matrix(other, False)
 
-        return self.mul(other, True)
+        return self.mul(other)
     
     def __matmul__(self, other):
         assert isinstance(other, Matrix), f"Cannot perform Matrix multiplication with type {type(other)}"
