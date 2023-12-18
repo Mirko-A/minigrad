@@ -105,14 +105,28 @@ from minitorch.matrix import Matrix
 
 def main():
     a = Matrix([3, 5], requires_grad=True)
-    b = Matrix([[2, 3, 1],
-                [1, 2, 0]])
+    b = Matrix([2, 3], requires_grad=True)
 
-    print(a)
-    print(b)
-    c = a @ b
+    c = 2 * a
+    #print(c)
+    d = a + b
+    #print(d)
+    e = c + d
+    #print(e)
+    f = e ** 0.5
+    #print(f)
+    g = f / 5.0
+    #print(g)
+    h = g.sum()
+    i = h.log()
+    print(i)
+    i.backward()
     print(c)
-    
+    print(d)
+    print(e)
+    print(f)
+    print(g)
+    print(h)
 
 if __name__ == "__main__":
     main()

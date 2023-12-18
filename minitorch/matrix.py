@@ -10,22 +10,22 @@ from minitorch.buffer import MiniBuffer
 class Function:
     def __init__(self, *inputs: Matrix) -> None:
         self.inputs_need_grad = [input.requires_grad for input in inputs]
-        self.requires_grad = True if any(self.inputs_need_grad) else False
-        if self.requires_grad:
+        self.output_requires_grad = True if any(self.inputs_need_grad) else False
+        if self.output_requires_grad:
             self.parents = inputs
 
-    def forward(self): assert False, f"forward not implemented for {type(self)}"
-    def backward(self): False, f"backward not implemented for {type(self)}"
+    def forward(self, *args, **kwargs) -> Matrix: assert False, f"forward not implemented for {type(self)}"
+    def backward(self, *args, **kwargs) -> Matrix: assert False, f"backward not implemented for {type(self)}"
 
     @classmethod
-    def apply(fn_ctor: Type[Function], *inputs: Matrix) -> Matrix: 
+    def apply(fn_ctor: Type[Function], *inputs: Matrix, **kwargs) -> Matrix: 
         # fn_ctor is the constructor of the child class from which 'apply' is called
         ctx = fn_ctor(*inputs)
-        result = Matrix(ctx.forward(*[input.data for input in inputs]), ctx.requires_grad)
+        result = Matrix(ctx.forward(*[input.data for input in inputs], **kwargs), ctx.output_requires_grad)
         
         # Keep the reference to the function which created the result
         # Used for autograd
-        if ctx.requires_grad:
+        if ctx.output_requires_grad:
             result._ctx = ctx
         
         return result
@@ -33,30 +33,21 @@ class Function:
 import minitorch.ops as ops
 
 class Matrix:
-    class Shape:
-        def __init__(self, row: int, col: int) -> None:
-            assert row > 0 and col > 0, "Row and column must be natural numbers."
-            
-            self.row = row
-            self.col = col
-        
-        def __eq__(self, __value) -> bool:
-            assert isinstance(__value, Matrix.Shape), f"Cannot compare a Shape and a {type(__value)}"
-            return self.row == __value.row and self.col == __value.col
-        
-        def __repr__(self) -> str:
-            return f"Shape: {self.row}x{self.col}"
-
+    # TODO: Try adding __slots__ for performance benchmarks
     def __init__(self, data: int | float | list[int] | list[float] | list[list[int]] | list[list[float]] | MiniBuffer, requires_grad: bool = False) -> None:
-        self.data, self.shape = Matrix._get_data_and_shape(data)
+        self.data = Matrix._create_buffer(data)
         self.requires_grad = requires_grad
         self.grad: Optional[Matrix] = None
         # Internal variable used for autograd graph construction
         self._ctx: Optional[Function] = None
 
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.data.shape
+
     @staticmethod
-    def _get_data_and_shape(data: int | float | list[int] | list[float] | list[list[int]] | list[list[float]] | MiniBuffer) -> tuple[MiniBuffer, Shape]:
-        def list_get_data_and_shape(data: list[int] | list[float] | list[list[int]] | list[list[float]]) -> tuple[MiniBuffer, Matrix.Shape]:
+    def _create_buffer(data: int | float | list[int] | list[float] | list[list[int]] | list[list[float]] | MiniBuffer) -> MiniBuffer:
+        def list_get_data(data: list[int] | list[float] | list[list[int]] | list[list[float]]) -> MiniBuffer:
             def create_float_list(data: list[int] | list[float]) -> list[float]:
                 if all(isinstance(val, int) for val in data):
                     return [float(val) for val in data]
@@ -75,25 +66,34 @@ class Matrix:
             else:
                 out_data.append(create_float_list(data))
 
-            return MiniBuffer(out_data), Matrix.Shape(len(out_data), len(out_data[0]))
+            return MiniBuffer(out_data)
         
         if isinstance(data, MiniBuffer):
-            return data, Matrix.Shape(len(data.data), len(data.data[0]))
+            return data
         elif isinstance(data, int):
-            return MiniBuffer([[float(data)]]), Matrix.Shape(1, 1)
+            return MiniBuffer([[float(data)]])
         elif isinstance(data, float):
-            return MiniBuffer([[data]]), Matrix.Shape(1, 1)
+            return MiniBuffer([[data]])
         elif isinstance(data, list):
-            return list_get_data_and_shape(data)
+            return list_get_data(data)
 
     # Static Matrix generation methods
     # TODO: Implement: fill, zeros, one_hot, randn, uniform, masked_fill, replace, tril, 
 
-    # Shape manipulation methods
+    # Movement methods
     # TODO: Implement: flatten
 
+    def expand(self, rows: int, cols: int) -> Matrix:
+        assert rows >= self.shape[0], "Cannot broadcast, new shape has less rows."
+        assert cols >= self.shape[1], "Cannot broadcast, new shape has less columns."
+
+        return ops.Expand.apply(self, rows=rows, cols=cols)
+
+    def reshape(self, rows: int, cols: int) -> Matrix:
+        return ops.Reshape.apply(self, rows=rows, cols=cols)
+
     def T(self) -> Matrix:
-        rows, cols = self.shape.row, self.shape.col
+        rows, cols = self.shape[0], self.shape[1]
         out_data = []
 
         for col_idx in range(cols):
@@ -106,39 +106,81 @@ class Matrix:
             
         return Matrix(out_data, self.requires_grad)
 
+    # Unary operations
+
+    def neg(self) -> Matrix:
+        return ops.Neg.apply()
+
+
+    def log(self, base: int | float = math.e) -> Matrix:
+        assert isinstance(base, (int, float)), f"Cannot perform log with non-scalar base. Expected: float or int, got {type(base)}"
+        if isinstance(base, int):
+            base = float(base)
+
+        return ops.Log.apply(self, base=base)
+
+    # Reduce operations
+
+    def sum(self, dim: Optional[int] = None) -> Matrix:
+        return ops.Sum.apply(self, dim=dim)
+
     # Binary operations
     # TODO: Implement: is_equal_to, is_elementwise_equal_to, sum, exp, log, 
 
     def add(self, other: Matrix, reverse: bool = False) -> Matrix:
         assert self.shape == other.shape, "Cannot perform addition. Matrices must have the same shape."
         
-        x, y = self, other 
-        
+        x, y = self, other
+
         if reverse:
             x, y = y, x
-        
+
         return ops.Add.apply(x, y)
     
     def sub(self, other: Matrix, reverse: bool = False) -> Matrix:
         assert self.shape == other.shape, "Cannot perform addition. Matrices must have the same shape."
-        
-        x, y = self, other 
-        
+
+        x, y = self, other
+
         if reverse:
             x, y = y, x
-        
+
         return ops.Sub.apply(x, y)
 
-    def mul(self, other: Matrix) -> Matrix:
+    def mul(self, other: Matrix, reverse: bool = False) -> Matrix:
         assert other.is_scalar(), f"Cannot perform Matrix and scalar multiplication. Expected scalar, got {other.shape}."
+        other = other.expand(self.shape[0], self.shape[1])
 
-        return ops.Mul.apply(self, other)
+        x, y = self, other
+
+        if reverse:
+            x, y = y, x
+
+        return ops.Mul.apply(x, y)
     
-    def div(self, other: Matrix) -> Matrix:
+    def div(self, other: Matrix, reverse: bool = False) -> Matrix:
         assert other.is_scalar(), f"Cannot perform Matrix and scalar division. Expected scalar, got {other.shape}."
+        other = other.expand(self.shape[0], self.shape[1])
 
-        return ops.Div.apply(self, other)
+        x, y = self, other
 
+        if reverse:
+            x, y = y, x
+
+        return ops.Div.apply(x, y)
+
+    def pow(self, other: Matrix, reverse: bool = False) -> Matrix:
+        assert other.is_scalar(), f"Cannot perform Matrix and scalar division. Expected scalar, got {other.shape}."
+        other = other.expand(self.shape[0], self.shape[1])
+
+        x, y = self, other
+
+        if reverse:
+            x, y = y, x
+
+        return ops.Pow.apply(x, y, is_exp=reverse)
+
+    # TODO: This does not calculate gradients
     def dot(self, other: Matrix) -> Matrix:
         x, y = self, other.T()
         out_data = []
@@ -158,14 +200,10 @@ class Matrix:
 
         return Matrix(out_data)
 
-    def matmul(self, other: Matrix, reverse: bool = False) -> Matrix:
+    def matmul(self, other: Matrix) -> Matrix:
         assert self.shape.col == other.shape.row, "Cannot perform Matrix multiplication. Inner dimensions do not match."
-        x, y = self, other 
-        
-        if reverse:
-            x, y = y, x
 
-        return x.dot(y)
+        return self.dot(other)
 
     # Activation functions
     # TODO: Implement sigmoid, relu, tanh, softmax
@@ -176,27 +214,28 @@ class Matrix:
     # Backpropagation
     # NOTE: Mirko A.
     # I did not understand this fully, go back and figure it out 
-    def deepwalk(self):
-        def _deepwalk(node: Matrix, visited: set[Matrix], nodes: list[Matrix]):
+    def toposort(self):
+        def _toposort(node: Matrix, visited: set[Matrix], nodes: list[Matrix]):
             visited.add(node)
 
             if getattr(node, "_ctx", None):
                 for parent in node._ctx.parents:
                     if parent not in visited: 
-                        _deepwalk(parent, visited, nodes)
+                        _toposort(parent, visited, nodes)
 
                 nodes.append(node)
 
             return nodes
       
-        return _deepwalk(self, set(), [])
+        return _toposort(self, set(), [])
 
     def backward(self):
         assert self.is_scalar(), f"Backward can only be called for scalar tensors, but it has shape {self.shape})"
 
         self.grad = Matrix(1, requires_grad=False)
+        autograd_graph = self.toposort()
 
-        for node in reversed(self.deepwalk()):
+        for node in reversed(autograd_graph):
             assert node.grad is not None
 
             grads = node._ctx.backward(node.grad.data)
@@ -208,9 +247,18 @@ class Matrix:
                     assert grad.shape == parent.shape, f"Grad shape must match Matrix shape, {grad.shape} != {parent.shape}"
                     parent.grad = grad if parent.grad is None else (parent.grad + grad)
             
-            del node._ctx
+            # TODO: Bring back if needed
+            # del node._ctx
 
-    # Operator magic methods
+    # Unary operator magic methods
+
+    def __neg__(self) -> Matrix:
+        return self.neg()
+
+    def __getitem__(self, key) -> list[float]:
+        return self.data[key]
+    
+    # Binary operator magic methods
 
     def __add__(self, other):
         if not isinstance(other, Matrix):
@@ -229,12 +277,9 @@ class Matrix:
             other = Matrix(other)
 
         return self.sub(other)
-    
-    def __rsub__(self, other):
-        if not isinstance(other, Matrix):
-            other = Matrix(other)
 
-        return self.sub(other, True)
+    def __rsub__(self, other):
+        assert False, "Operation rsub not supported."
 
     def __mul__(self, other):
         if not isinstance(other, Matrix):
@@ -243,21 +288,35 @@ class Matrix:
         return self.mul(other)
     
     def __rmul__(self, other):
-        if not isinstance(other, Matrix):
-            other = Matrix(other, False)
+        other = Matrix(other, False)
 
-        return self.mul(other)
-    
-    def __matmul__(self, other):
-        assert isinstance(other, Matrix), f"Cannot perform Matrix multiplication with type {type(other)}"
-
-        return self.matmul(other)
+        return self.mul(other, True)
 
     def __truediv__(self, other):
         if not isinstance(other, Matrix):
             other = Matrix(other, False)
 
         return self.div(other)
+    
+    def __rtruediv__(self, other):
+        assert False, "Operation rsub not supported."
+    
+    def __pow__(self, other):
+        if not isinstance(other, Matrix):
+            other = Matrix(other, False)
+
+        return self.pow(other)
+
+    def __rpow__(self, other):
+        if not isinstance(other, Matrix):
+            other = Matrix(other, False)
+
+        return self.pow(other, True)
+
+    def __matmul__(self, other):
+        assert isinstance(other, Matrix), f"Cannot perform Matrix multiplication with type {type(other)}"
+
+        return self.matmul(other)
     
     def __eq__(self, other):
         if isinstance(other, Matrix):
@@ -267,14 +326,14 @@ class Matrix:
         else:
             assert False, f"Invalid type for matrix equality: {type(other)}. Expected Matrix or float."
 
-    def __getitem__(self, key) -> list[float]:
-        return self.data[key]
+    def __hash__(self):
+        return id(self)
 
     # Utility
     # TODO: Implement item, grad, is_square
 
-    def is_scalar(self):
-        return self.shape.row == 1 and self.shape.col == 1
+    def is_scalar(self) -> bool:
+        return self.data.is_scalar()
     
     def __repr__(self) -> str:
         return f"<Matrix {self.data} with grad {self.grad.data if self.grad else None}>"
@@ -574,35 +633,35 @@ class Matrix:
 #         return Matrix(out_data, x.requires_grad)
 
 #     def sum(self, dim: int | None = None) -> Matrix:
-#         assert dim in Matrix._VALID_DIM_VALUES + [None], "Invalid dimension value provided. Expected: None, 0 or 1."
+        # assert dim in Matrix._VALID_DIM_VALUES + [None], "Invalid dimension value provided. Expected: None, 0 or 1."
         
-#         def sum_all(input: Matrix) -> Matrix:
-#             out_data = 0
+        # def sum_all(input: Matrix) -> Matrix:
+        #     out_data = 0
 
-#             for row in input.data:
-#                 for value in row:
-#                     out_data += value
+        #     for row in input.data:
+        #         for value in row:
+        #             out_data += value
 
-#             return Matrix([[out_data]], input.requires_grad)
+        #     return Matrix([[out_data]], input.requires_grad)
 
-#         def sum_along_dim(input: Matrix, dim: int) -> Matrix:
-#             input = input if dim == 1 else input.T()
-#             out_data = []
+        # def sum_along_dim(input: Matrix, dim: int) -> Matrix:
+        #     input = input if dim == 1 else input.T()
+        #     out_data = []
 
-#             for row in input.data:
-#                 out_row = 0
+        #     for row in input.data:
+        #         out_row = 0
                 
-#                 for value in row:
-#                     out_row += value
+        #         for value in row:
+        #             out_row += value
 
-#                 out_data.append([out_row])
+        #         out_data.append([out_row])
 
-#             return Matrix(out_data, input.requires_grad)
+        #     return Matrix(out_data, input.requires_grad)
 
-#         if dim is None:
-#             return sum_all(self)
-#         else:
-#             return sum_along_dim(self, dim)
+        # if dim is None:
+        #     return sum_all(self)
+        # else:
+        #     return sum_along_dim(self, dim)
 
 #     def exp(self) -> Matrix:
 #         out_data = []
