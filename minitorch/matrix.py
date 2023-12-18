@@ -111,7 +111,6 @@ class Matrix:
     def neg(self) -> Matrix:
         return ops.Neg.apply()
 
-
     def log(self, base: int | float = math.e) -> Matrix:
         assert isinstance(base, (int, float)), f"Cannot perform log with non-scalar base. Expected: float or int, got {type(base)}"
         if isinstance(base, int):

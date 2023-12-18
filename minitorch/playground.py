@@ -104,8 +104,10 @@ from minitorch.nn.optim import SGD
 from minitorch.matrix import Matrix
 
 def main():
-    a = Matrix([3, 5], requires_grad=True)
-    b = Matrix([2, 3], requires_grad=True)
+    a = Matrix([[3, 5],
+                [2, 3]], requires_grad=True)
+    b = Matrix([[2, 3],
+                [2, 3]], requires_grad=True)
 
     c = 2 * a
     #print(c)
@@ -117,10 +119,11 @@ def main():
     #print(f)
     g = f / 5.0
     #print(g)
-    h = g.sum()
-    i = h.log()
-    print(i)
-    i.backward()
+    h = g.sum(0)
+    i = h.sum()
+    j = i.log()
+    print(j)
+    j.backward()
     print(c)
     print(d)
     print(e)

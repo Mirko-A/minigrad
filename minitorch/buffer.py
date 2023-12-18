@@ -71,7 +71,7 @@ class MiniBuffer:
             return MiniBuffer([[out_data]])
 
         def sum_along_dim(input: MiniBuffer, dim: int) -> MiniBuffer:
-            input = input if dim == 1 else input.T()
+            input = input if dim == 0 else input.T()
             out_data = []
 
             for row in input.data:
@@ -194,11 +194,11 @@ class MiniBuffer:
         expand_along_cols = cols > old_shape[1]
 
         if expand_along_rows and expand_along_cols:
-            assert MiniBuffer.is_scalar(), "Cannot expand a non-scalar along both dimensions."
+            assert self.is_scalar(), "Cannot expand a non-scalar along both dimensions."
             return MiniBuffer.fill(rows, cols, self[0][0])
         elif expand_along_rows:
             for _ in range(rows):
-                out_data.append(rows[0])
+                out_data.append(self.data[0])
                 
             return MiniBuffer(out_data)
         elif expand_along_cols:
