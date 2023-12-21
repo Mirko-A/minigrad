@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from minitorch.matrix import Matrix
+from minitorch.tensor import Tensor
 import math
 
 class Optimizer:
-    def __init__(self, parameters: Matrix, learning_rate: float) -> None:
+    def __init__(self, parameters: Tensor, learning_rate: float) -> None:
         self.parameters = parameters.flatten().item()
         self.learning_rate = learning_rate
 
@@ -16,7 +16,7 @@ class Optimizer:
             p.grad = 0.0
 
 class SGD(Optimizer):
-    def __init__(self, parameters: Matrix, learning_rate: float) -> None:
+    def __init__(self, parameters: Tensor, learning_rate: float) -> None:
         super().__init__(parameters, learning_rate)
 
     def step(self) -> None:
@@ -24,7 +24,7 @@ class SGD(Optimizer):
             p.data -= p.grad * self.learning_rate
                 
 class Adam(Optimizer):
-    def __init__(self, parameters: Matrix, learning_rate: float, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-08) -> None:
+    def __init__(self, parameters: Tensor, learning_rate: float, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-08) -> None:
         super().__init__(parameters, learning_rate)
         self.betas = betas
         self.eps = eps

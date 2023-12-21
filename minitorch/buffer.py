@@ -1,63 +1,203 @@
 from __future__ import annotations
-import math
 from typing import Optional
+from enum import Enum, auto
+import numpy as np
+import math
 
 class MiniBuffer:
-    _VALID_DIM_VALUES = [0, 1]
+    # TODO: Add more...
+    class UnaryOp(Enum):
+        NEG  = 0
+        LOG  = auto()
+        LOG2 = auto()
+    class BinaryOp(Enum):
+        ADD = 0
+        SUB = auto()
+        MUL = auto()
+        DIV = auto()
+        POW = auto()
+        MAX = auto()
 
-    def __init__(self, data: list[list[float]]) -> None:
-        assert all(len(row) == len(data[0]) for row in data), "Cannot create MiniBuffer. All rows must have the same length."
+    def __init__(self, 
+                 data: list[float], 
+                 shape: tuple[int, ...], 
+                 strides: Optional[tuple[int, ...]] = None) -> None:
+        def _get_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
+            strides = ()
+            shape_len = len(shape)
+
+            for dim_idx in range(shape_len):
+                # Stride for each dimension is calculated by taking the product 
+                # of all the dimension sizes (shapes) proceeding it. The last
+                # dimension always has a stride of 1.
+                if dim_idx == shape_len:
+                    strides += (1,)
+                else:
+                    strides += (math.prod(shape[dim_idx + 1:]),)
+
+            return strides
+        
+        assert isinstance(data, list) and all(isinstance(value, float) for value in data), \
+                f"Cannot construct buffer. Expected data type is list[float] but got: {type(data)}."
+        assert isinstance(shape, tuple) and all(isinstance(dim, int) for dim in shape), \
+                f"Cannot construct buffer. Expected shape type is tuple[int, ...] but got {type(shape)}"
+        
         self.data = data
-        self.shape = (len(data), len(data[0]))
+        self.shape = shape
+
+        if strides is None:
+            self.strides = _get_strides(shape)
+        else:
+            self.strides = strides
 
     # Static MiniBuffer generation operations
 
     @staticmethod
-    def fill(rows: int, cols: int, value: float) -> MiniBuffer:
+    def np_load(data: list) -> MiniBuffer:
+        _np = np.array(data)
+        shape = ()
+
+        for shape_n in _np.shape:
+            shape += (shape_n,)
+        
+        return MiniBuffer(_np.reshape(-1).astype(np.float32).tolist(), shape)
+
+    @staticmethod
+    def fill(shape: tuple[int, ...], value: float | int) -> MiniBuffer:
+        if isinstance(value, int):
+            value = float(value)
+            
+        total_elements = math.prod(shape)
+
+        return MiniBuffer([value] * total_elements, shape)
+
+    @staticmethod
+    def full_like(input: MiniBuffer, value: float | int) -> MiniBuffer:
+        if isinstance(value, int):
+            value = float(value)
+
+        return MiniBuffer.fill(input.shape, value)
+
+    @staticmethod
+    def masked_fill(input: MiniBuffer, mask: list[list[bool]], value: float) -> MiniBuffer:
+        assert len(mask) == input.shape[0] and                              \
+               all(len(mask_row) == input.shape[1] for mask_row in mask),   \
+               "Input Matrix and mask must have the same dimensions."
+      
         out_data = []
 
-        for _ in range(rows):
-            out_row = []
+        for in_row, mask_row in zip(input.data, mask):
+            out_data_row = []
 
-            for _ in range (cols):
-                out_row.append(value)
+            for in_value, mask_value in zip(in_row, mask_row):
+                out_data_row.append(value if mask_value == True else in_value)
 
-            out_data.append(out_row)
+            out_data.append(out_data_row)
 
         return MiniBuffer(out_data)
 
+    # Math operations
+
+    # This function iterates over the elements of all provided dimensions 
+    # (taken from 'current_shape' which starts as the shape of the operand)
+    # and performs the following:
+    # Check if we've reached  the last dimension -> that's where the values
+    # are! We iterate over the values and append them to the output list.
+    # Otherwise, we iterate over the elements of the current (non-last)
+    # dimension and recursively call this function stripping away the
+    # current dimension (from 'current_shape') and its corresponding
+    # stride. All of the calls to this function return a list of floats
+    # which we can just append to the initial empty list.
+    @staticmethod
+    def _traverse_dims_and_apply_op(current_shape: tuple[int, ...],
+                                    current_strides: tuple[int, ...],
+                                    current_position: int,
+                                    op: UnaryOp | BinaryOp,
+                                    *operands: MiniBuffer) -> list[float]:
+        def apply_op_unary(op: MiniBuffer.UnaryOp, x: float) -> float:
+            if op == MiniBuffer.UnaryOp.NEG:
+                return -x
+            elif op == MiniBuffer.UnaryOp.LOG:
+                return math.log(x, math.e)
+            elif op == MiniBuffer.UnaryOp.LOG2:
+                return math.log(x, 2)
+            else:
+                assert False, "Not yet implemented operation"
+
+        def apply_op_binary(op: MiniBuffer.BinaryOp, x: float, y: float) -> MiniBuffer:
+            if op == MiniBuffer.BinaryOp.ADD:
+                return x + y
+            elif op == MiniBuffer.BinaryOp.SUB:
+                return x - y
+            elif op == MiniBuffer.BinaryOp.MUL:
+                return x * y
+            elif op == MiniBuffer.BinaryOp.DIV:
+                return x / y
+            elif op == MiniBuffer.BinaryOp.POW:
+                return x ** y
+            elif op == MiniBuffer.BinaryOp.MAX:
+                return max(x, y)
+            else:
+                assert False, "Not yet implemented operation"
+
+        out_data = []
+
+        if len(current_shape) == 1:
+            for val_idx in range(current_shape[0]):
+                target_position = current_position + val_idx * current_strides[0]
+            
+                if isinstance(op, MiniBuffer.UnaryOp):
+                    out_data.append(apply_op_unary(op, 
+                                                   operands[0].data[target_position]))
+                elif isinstance(op, MiniBuffer.BinaryOp):
+                    out_data.append(apply_op_binary(op, 
+                                                    operands[0].data[target_position],
+                                                    operands[1].data[target_position]))
+                else:
+                    assert False, f"Invalid operation: {type(op)}."
+        else:
+            for dim_idx in range(current_shape[0]):
+                current_position = dim_idx * current_strides[0]
+                out_data += MiniBuffer._traverse_dims_and_apply_op(current_shape[1:],
+                                                                   current_strides[1:],
+                                                                   current_position,
+                                                                   op,
+                                                                   *operands)
+        
+        return out_data
+    
     # Unary operations
 
     def neg(self) -> MiniBuffer:
-        out_data = []
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.UnaryOp.NEG,
+                                                          self)
 
-        for x_row in self.data:
-            out_row = []
+        return MiniBuffer(out_data, self.shape)
 
-            for x_val in x_row:
-                out_row.append(-x_val)
+    def log(self) -> MiniBuffer:
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.UnaryOp.LOG,
+                                                          self)
 
-            out_data.append(out_row)
+        return MiniBuffer(out_data, self.shape)
 
-        return MiniBuffer(out_data)
+    def log2(self) -> MiniBuffer:
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.UnaryOp.LOG2,
+                                                          self)
 
-    def log(self, base: float = math.e) -> MiniBuffer:
-        assert isinstance(base, float), f"Cannot perform log with non-scalar base. Expected: float, got {type(base)}"
-        
-        out_data = []
-
-        for x_row in self.data:
-            out_row = []
-
-            for x_val in x_row:
-                out_row.append(math.log(x_val, base))
-
-            out_data.append(out_row)
-
-        return MiniBuffer(out_data)
+        return MiniBuffer(out_data, self.shape)
 
     # Reduce operations
 
+    # TODO: Not implemented!!
     def sum(self, dim: Optional[int] = None):
         assert dim in MiniBuffer._VALID_DIM_VALUES + [None], "Invalid dimension value provided. Expected: None, 0 or 1."
         
@@ -71,7 +211,7 @@ class MiniBuffer:
             return MiniBuffer([[out_data]])
 
         def sum_along_dim(input: MiniBuffer, dim: int) -> MiniBuffer:
-            input = input if dim == 0 else input.T()
+            input = input if dim == 1 else input.T()
             out_data = []
 
             for row in input.data:
@@ -92,134 +232,165 @@ class MiniBuffer:
     # Binary operations
 
     def add(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = []
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.BinaryOp.ADD,
+                                                          self, other)
 
-        for x_row, y_row in zip(self.data, other.data):
-            out_row = []
-
-            for x_val, y_val in zip(x_row, y_row):
-                out_row.append(x_val + y_val)
-
-            out_data.append(out_row)
-
-        return MiniBuffer(out_data)
+        return MiniBuffer(out_data, self.shape)
     
     def sub(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = []
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.BinaryOp.SUB,
+                                                          self, other)
 
-        for x_row, y_row in zip(self.data, other.data):
-            out_row = []
-
-            for x_val, y_val in zip(x_row, y_row):
-                out_row.append(x_val - y_val)
-
-            out_data.append(out_row)
-
-        return MiniBuffer(out_data)
+        return MiniBuffer(out_data, self.shape)
 
     def mul(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = []
-
-        for x_row, y_row in zip(self.data, other.data):
-            out_row = []
-
-            for x_val, y_val in zip(x_row, y_row):
-                out_row.append(x_val * y_val)
-
-            out_data.append(out_row)
-
-        return MiniBuffer(out_data)
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.BinaryOp.MUL,
+                                                          self, other)
+    
+        return MiniBuffer(out_data, self.shape)
     
     def div(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = []
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.BinaryOp.DIV,
+                                                          self, other)
 
-        for x_row, y_row in zip(self.data, other.data):
-            out_row = []
-
-            for x_val, y_val in zip(x_row, y_row):
-                out_row.append(x_val / y_val)
-
-            out_data.append(out_row)
-
-        return MiniBuffer(out_data)
-
+        return MiniBuffer(out_data, self.shape)
+    
     def pow(self, other: MiniBuffer) -> MiniBuffer:
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.BinaryOp.POW,
+                                                          self, other)
+
+        return MiniBuffer(out_data, self.shape)
+    
+    def max(self, other: MiniBuffer) -> MiniBuffer:
+        out_data = MiniBuffer._traverse_dims_and_apply_op(self.shape,
+                                                          self.strides,
+                                                          0,
+                                                          MiniBuffer.BinaryOp.MAX,
+                                                          self, other)
+
+        return MiniBuffer(out_data, self.shape)
+    
+    def is_equal_to(self, target: MiniBuffer) -> bool:
+        assert self.shape == target.shape, "Cannot compare Matrices if shape doesn't match."
+
+        for batch_idx in range(self.shape[0]):
+            for row_idx in range(self.shape[1]):
+                for col_idx in range(self.shape[2]):
+                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
+                    
+                    if self.data[position] != target.data[position]:
+                        return False
+
+        return True
+
+    def is_elementwise_greater_than(self, target: (int | float)) -> list[list[list[bool]]]:
+        if isinstance(target, int):
+            target = float(target)
+
         out_data = []
 
-        for x_row, y_row in zip(self.data, other.data):
-            out_row = []
+        for batch_idx in range(self.shape[0]):
+            out_batch = []
 
-            for x_val, y_val in zip(x_row, y_row):
-                out_row.append(x_val ** y_val)
+            for row_idx in range(self.shape[1]):
+                out_row = []
 
-            out_data.append(out_row)
+                for col_idx in range(self.shape[2]):
+                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
+                    out_row.append(self.data[position] > target)
 
-        return MiniBuffer(out_data)
+                out_batch.append(out_row)
+
+            out_data.append(out_batch)
+
+        return out_data
+    
+    def is_elementwise_less_than(self, target: (int | float)) -> list[list[bool]]:
+        if isinstance(target, int):
+            target = float(target)
+
+        out_data = []
+
+        for batch_idx in range(self.shape[0]):
+            out_batch = []
+
+            for row_idx in range(self.shape[1]):
+                out_row = []
+
+                for col_idx in range(self.shape[2]):
+                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
+                    out_row.append(self.data[position] < target)
+
+                out_batch.append(out_row)
+
+            out_data.append(out_batch)
+
+        return out_data
+    
+    def is_elementwise_equal_to(self, target: (int | float)) -> list[list[bool]]:
+        if isinstance(target, int):
+            target = float(target)
+
+        out_data = []
+
+        for batch_idx in range(self.shape[0]):
+            out_batch = []
+
+            for row_idx in range(self.shape[1]):
+                out_row = []
+
+                for col_idx in range(self.shape[2]):
+                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
+                    out_row.append(self.data[position] == target)
+
+                out_batch.append(out_row)
+
+            out_data.append(out_batch)
+
+        return out_data
 
     # Movemenet operations
 
-    def flatten(self) -> MiniBuffer:
-        rows, cols = self.shape[0], self.shape[1]
-        out_data = []
-
-        for col_idx in range(cols):
-            out_row = []
-
-            for row_idx in range(rows):
-                out_row.append(self.data.data[row_idx][col_idx])
-
-            out_data.append(out_row)
-            
-        return MiniBuffer(out_data)
+    def reshape(self, new_shape: tuple[int, ...]) -> MiniBuffer:
+        return MiniBuffer(self.data, new_shape)
     
-    def T(self) -> MiniBuffer:
-        rows, cols = self.shape[0], self.shape[1]
-        out_data = []
+    def flatten(self) -> MiniBuffer:
+        total_elements = math.prod(self.shape)
 
-        for col_idx in range(cols):
-            out_row = []
+        return MiniBuffer(self.data, (1, 1, total_elements))
 
-            for row_idx in range(rows):
-                out_row.append(self.data[row_idx][col_idx])
+    def permute(self, order: tuple[int, ...]) -> MiniBuffer:
+        new_dims = ()
+        new_strides = ()
 
-            out_data.append(out_row)
-            
-        return MiniBuffer(out_data)
+        for ord in order:
+            new_dims += (self.shape[ord],)
+            new_strides += (self.strides[ord],)
 
-    def expand(self, rows: int, cols: int) -> MiniBuffer:
+        return MiniBuffer(self.data, new_dims, strides=new_strides)
+
+    # TODO: Not implemented!!
+    def expand(self, shape: tuple[int, ...]) -> MiniBuffer:
         old_shape = self.shape
         out_data = []
 
-        expand_along_rows = rows > old_shape[0]
-        expand_along_cols = cols > old_shape[1]
+        return MiniBuffer.fill(shape, 0)
 
-        if expand_along_rows and expand_along_cols:
-            assert self.is_scalar(), "Cannot expand a non-scalar along both dimensions."
-            return MiniBuffer.fill(rows, cols, self[0][0])
-        elif expand_along_rows:
-            for _ in range(rows):
-                out_data.append(self.data[0])
-                
-            return MiniBuffer(out_data)
-        elif expand_along_cols:
-            for row_idx in range(old_shape[0]):
-                out_data.append([self.data[row_idx][0]] * cols)
-
-            return MiniBuffer(out_data)
-        else:
-            return MiniBuffer(self.data)
-
-    def reshape(self, rows: int, cols: int) -> MiniBuffer:
-        flattened = self.flatten()
-        assert flattened.shape[1] == (rows * cols), "Cannot reshape, new dimensions don't match the current shape."
-
-        out_data = []
-
-        for row in range(rows):
-            out_data.append(flattened[0][row : (row + cols)])
-
-        return MiniBuffer(out_data)
-    
     # Unary operator magic methods
 
     def __neg__(self):
@@ -255,37 +426,57 @@ class MiniBuffer:
     # Utility
 
     def is_scalar(self) -> bool:
-        return self.shape[0] == 1 and self.shape[1] == 1
+        return len(self.shape) == 1
+
+    def is_square(self) -> bool:
+        return self.shape[-2] == self.shape[-1]
 
     def __getitem__(self, key) -> list[float]:
         return self.data[key]
-    
+
     def __repr__(self) -> str:
-        repr = str("([")
+        repr = str("[")
 
-        for row_idx, row in enumerate(self.data):
-            if not row_idx == 0:
-                repr += "          ["
-            else:
-                repr += "["
+        repr += MiniBuffer._traverse_dims_and_repr(self.shape,
+                                                   self.strides,
+                                                   0,
+                                                   self)
+        
+        repr += "]"
+
+        return repr
+    
+    @staticmethod
+    def _traverse_dims_and_repr(current_shape: tuple[int, ...],
+                                current_strides: tuple[int, ...],
+                                current_position: int,
+                                x: MiniBuffer) -> str:
+        repr = ""
+
+        if len(current_shape) == 1:
+            for val_idx in range(current_shape[0]):
+                target_position = current_position + val_idx * current_strides[0]
             
-            for col_idx, value in enumerate(row):
-                value_str = f"{value:.4f}"
-                
-                if value > 0:
-                    # Indent to align with '-' character of negative numbers
-                    value_str = " " + value_str
-                    
-                if not col_idx == (len(row) - 1):
-                    repr += value_str + ", "
+                if val_idx == (current_shape[0] - 1):
+                    repr += f"{x.data[target_position]}"
                 else:
-                    repr += value_str
+                    repr += f"{x.data[target_position]}, "
+        else:
+            for dim_idx in range(current_shape[0]):
+                if dim_idx == 0:
+                    repr += "["
+                else:
+                    repr += "           ["
 
-            if not row_idx == (len(self.data) - 1):
-                repr += "],\n"
-            else:
-                repr += "]"
-
-        repr += "])"
+                current_position = dim_idx * current_strides[0]
+                repr += MiniBuffer._traverse_dims_and_repr(current_shape[1:],
+                                                           current_strides[1:],
+                                                           current_position,
+                                                           x)
+        
+                if dim_idx == (current_shape[0] - 1):
+                    repr += "]"
+                else:
+                    repr += "],\n"
 
         return repr

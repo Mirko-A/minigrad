@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from minitorch.matrix import Matrix
+from minitorch.tensor import Tensor
 
 class Module(ABC):
     @abstractmethod
-    def forward(self, input: Matrix) -> Matrix:
+    def forward(self, input: Tensor) -> Tensor:
         ...
 
     @abstractmethod
-    def parameters(self) -> Matrix:
+    def parameters(self) -> Tensor:
         ...

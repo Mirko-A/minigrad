@@ -1,13 +1,13 @@
 from minitorch.nn.module import Module
 from minitorch.ops import Function
-from minitorch.matrix import Matrix
+from minitorch.matrix import Tensor
 
 class Sequence(Module):
     def __init__(self, *components: Module | Function) -> None:
         self.components = components
         self._parameters = self.get_components_params()
         
-    def forward(self, input: Matrix) -> Matrix:
+    def forward(self, input: Tensor) -> Tensor:
         next_input = input
         
         for component in self.components:
@@ -16,23 +16,23 @@ class Sequence(Module):
         
         return next_input
     
-    def parameters(self) -> Matrix:
+    def parameters(self) -> Tensor:
         return self._parameters
         
-    def get_components_params(self) -> Matrix:
+    def get_components_params(self) -> Tensor:
         params = []
         
         for component in self.components:
             if hasattr(component, 'parameters'):
                 params.append(component.parameters())
                 
-        params_concat = Matrix.cat(params, dim=1)
+        params_concat = Tensor.cat(params, dim=1)
         return params_concat
     
     def get_component(self, id):
         return self.components[id]
         
-    def __call__(self, input: Matrix) -> Matrix:
+    def __call__(self, input: Tensor) -> Tensor:
         return self.forward(input)
     
     def __repr__(self) -> str:

@@ -1,9 +1,10 @@
 from __future__ import annotations
-import math
 from typing import Optional
+import math
 
-from minitorch.matrix import Function
+from minitorch.tensor import Function
 from minitorch.buffer import MiniBuffer
+from minitorch import helpers
 
 # Unary operations
 
@@ -15,14 +16,24 @@ class Neg(Function):
         return -chain_grad
 
 class Log(Function):
-    def forward(self, x: MiniBuffer, base: float) -> MiniBuffer:
+    def forward(self, x: MiniBuffer) -> MiniBuffer:
         self.x = x
-        self.base = base
+        self.base = math.e
 
-        return x.log(base)
+        return x.log()
     
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad / (self.x * MiniBuffer.fill(self.x.shape[0], self.x.shape[1], self.base).log())
+        return chain_grad / (self.x * MiniBuffer.full_like(self.x, self.base).log())
+
+class Log2(Function):
+    def forward(self, x: MiniBuffer) -> MiniBuffer:
+        self.x = x
+        self.base = 2
+
+        return x.log2()
+    
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad / (self.x * MiniBuffer.full_like(self.x, self.base).log())
 
 # Reduce operations
 
@@ -94,13 +105,22 @@ class Pow(Function):
     
     def backward(self, chain_grad: MiniBuffer) -> tuple[Optional[MiniBuffer], Optional[MiniBuffer]]:
         if self.was_exp:
-            return chain_grad * ((self.base ** self.exp) * self.base.log(math.e)) if self.inputs_need_grad[0] else None, \
-                    chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.fill(self.exp.shape[0], self.exp.shape[1], 1.0)))) if self.inputs_need_grad[1] else None
-        else:
-            return chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.fill(self.exp.shape[0], self.exp.shape[1], 1.0)))) if self.inputs_need_grad[0] else None, \
+            return chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.full_like(self.exp, 1.0)))) if self.inputs_need_grad[0] else None, \
                     chain_grad * ((self.base ** self.exp) * self.base.log(math.e)) if self.inputs_need_grad[1] else None
+        else:
+            return chain_grad * ((self.base ** self.exp) * self.base.log(math.e)) if self.inputs_need_grad[0] else None, \
+                    chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.full_like(self.exp, 1.0)))) if self.inputs_need_grad[1] else None
 
 # Movement operations
+
+class Permute(Function):
+    def forward(self, x: MiniBuffer, order: tuple[int, ...]) -> MiniBuffer:
+        self.input_order = order
+
+        return x.permute(order)
+
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad.permute(helpers.argsort(self.input_order))
 
 # NOTE: this is sum in reverse
 class Expand(Function):
@@ -117,19 +137,38 @@ class Expand(Function):
 
         return x.expand(rows, cols)
 
-    def backward(self, chain_grad:MiniBuffer) -> MiniBuffer:
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.sum(self.reduce_dim)
 
 class Reshape(Function):
-    def forward(self, x: MiniBuffer, rows: int, cols: int) -> MiniBuffer:
-        self.input_rows = x.shape[0]
-        self.input_cols = x.shape[1]
-        return x.reshape(rows, cols)
+    def forward(self, x: MiniBuffer, new_shape: tuple[int, ...]) -> MiniBuffer:
+        self.input_shape = x.shape
+
+        return x.reshape(new_shape)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.reshape(self.input_rows, self.input_cols)
+        return chain_grad.reshape(self.input_shape)
 
 # Activation functions
+
+class Sigmoid(Function):
+    def forward(self, x: MiniBuffer) -> MiniBuffer:
+        self.result = MiniBuffer.full_like(x, 1) / (MiniBuffer.full_like(x, 1) + MiniBuffer.full_like(x, math.e) ** (-x))
+
+        return self.result
+
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad * (self.result * (MiniBuffer.full_like(self.result, 1.0) - self.result))
+
+class Relu(Function):
+    def forward(self, x: MiniBuffer) -> MiniBuffer:
+        self.result = x.max(MiniBuffer.full_like(x, 0.0))
+        return self.result
+
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad * MiniBuffer.masked_fill(MiniBuffer.full_like(self.result, 0.0),
+                                                   MiniBuffer.full_like(self.result, 0.0) < self.result,
+                                                   1.0)
 
 # class Sigmoid(Function):
 #     def forward(self, input: Matrix) -> Matrix:
