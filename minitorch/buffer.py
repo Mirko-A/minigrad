@@ -27,21 +27,6 @@ class MiniBuffer:
                  data: list[float], 
                  shape: tuple[int, ...], 
                  strides: Optional[tuple[int, ...]] = None) -> None:
-        def _get_strides(shape: tuple[int, ...]) -> tuple[int, ...]:
-            strides = ()
-            shape_len = len(shape)
-
-            for dim_idx in range(shape_len):
-                # Stride for each dimension is calculated by taking the product 
-                # of all the dimension sizes (shapes) proceeding it. The last
-                # dimension always has a stride of 1.
-                if dim_idx == shape_len:
-                    strides += (1,)
-                else:
-                    strides += (math.prod(shape[dim_idx + 1:]),)
-
-            return strides
-        
         assert isinstance(data, list) and all(isinstance(value, float) for value in data), \
                 f"Cannot construct buffer. Expected data type is list[float] but got: {type(data)}."
         assert isinstance(shape, tuple) and all(isinstance(dim, int) for dim in shape), \
@@ -51,7 +36,7 @@ class MiniBuffer:
         self.shape = shape
 
         if strides is None:
-            self.strides = _get_strides(shape)
+            self.strides = MiniBuffer.get_strides_from_shape(shape)
         else:
             self.strides = strides
 
@@ -341,15 +326,17 @@ class MiniBuffer:
         out_shape = [dim for dim in self.shape]
         out_shape[expansion_dim] = expanded_size
         out_shape = tuple(out_shape)
-        
-        # out_strides = [dim for dim in self.strides]
-        # if expansion_dim > 0:
-        #     out_strides[expansion_dim - 1] *= expanded_size
-        # out_strides = tuple(out_strides)
+
+        # Without this, expand wouldn't care about the strides 
+        # of the new Tensor. This checks if the dimension we 
+        # are expanding across is the 0th dimension.
+        out_strides = [stride for stride in MiniBuffer.get_strides_from_shape(out_shape)]
+        out_strides[-2], out_strides[-1] = out_strides[-1], out_strides[-2]
+        out_strides = tuple(out_strides)
 
         out_data = self.data * expanded_size
 
-        return MiniBuffer(out_data, out_shape)
+        return MiniBuffer(out_data, out_shape, out_strides)
 
     # Unary operator magic methods
 
@@ -407,6 +394,22 @@ class MiniBuffer:
 
     # Helper static methods
     
+    @staticmethod
+    def get_strides_from_shape(shape: tuple[int, ...]) -> tuple[int, ...]:
+        strides = ()
+        shape_len = len(shape)
+
+        for dim_idx in range(shape_len):
+            # Stride for each dimension is calculated by taking the product 
+            # of all the dimension sizes (shapes) proceeding it. The last
+            # dimension always has a stride of 1.
+            if dim_idx == shape_len:
+                strides += (1,)
+            else:
+                strides += (math.prod(shape[dim_idx + 1:]),)
+
+        return strides
+
     # This function iterates over the elements of all provided dimensions 
     # (taken from 'current_shape' which starts as the shape of the operand)
     # and performs the following:
@@ -571,9 +574,9 @@ class MiniBuffer:
                 target_position = current_position + val_idx * x.strides[depth_idx]
             
                 if val_idx == (x.shape[depth_idx] - 1):
-                    repr += f"{x.data[target_position]}"
+                    repr += f"{x.data[target_position]:.4f}"
                 else:
-                    repr += f"{x.data[target_position]}, "
+                    repr += f"{x.data[target_position]:.4f}, "
         else:
             for dim_idx in range(x.shape[depth_idx]):
                 # Check if we are at the beginning of the current dimension.

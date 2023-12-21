@@ -230,12 +230,6 @@ class Tensor:
             if new_dim > current_dim:
                 assert current_dim == 1, "Cannot expand along a non-singular dimension."
                 x = ops.Expand.apply(x, expansion_dim=dim_idx, expanded_size=new_dim)
-
-                # Without this, expand wouldn't care about the strides 
-                # of the new Tensor. This checks if the dimension we 
-                # are expanding across is the 0th dimension.
-                if dim_idx == len(new_shape) - 1:
-                    x = x.T
         
         return x
     
@@ -338,10 +332,10 @@ class Tensor:
 
         if shape_delta > 0:
             new_shape = (1,) * shape_delta + yshape 
-            y = y.reshape(new_shape[0], new_shape[1])
+            y = y.reshape(new_shape)
         elif shape_delta < 0:
             new_shape = (1,) * -shape_delta + xshape 
-            x = x.reshape(new_shape[0], new_shape[1])
+            x = x.reshape(new_shape)
 
         if (xshape:=x.shape) == (yshape:=y.shape): 
             return (x, y)
@@ -349,9 +343,9 @@ class Tensor:
         shape_ret = tuple([max(x, y) for x, y in zip(xshape, yshape)])
 
         if xshape != shape_ret: 
-            x = x.expand(shape_ret[0], shape_ret[1])
+            x = x.expand(shape_ret)
         if yshape != shape_ret: 
-            y = y.expand(shape_ret[0], shape_ret[1])
+            y = y.expand(shape_ret)
 
         return (x, y)
 
