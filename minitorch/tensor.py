@@ -161,23 +161,84 @@ class Tensor:
 
         return ops.Reshape.apply(self, new_shape=(total_elements, ))
 
-    def expand(self, rows: int, cols: int) -> Tensor:
-        assert rows >= self.shape[0], "Cannot broadcast, new shape has less rows."
-        assert cols >= self.shape[1], "Cannot broadcast, new shape has less columns."
-
-        return ops.Expand.apply(self, rows=rows, cols=cols)
-
     def permute(self, order: tuple[int, ...]) -> Tensor:
-        assert len(self.shape) == len(order), \
-                f"Cannot permute Tensor. Expected {len(self.shape)} dimension but got {len(order)}"
+        assert len(order) >= len(self.shape), \
+                f"Cannot permute Tensor. new shape dimensionality {len(order)} is smaller than original one {len(self.shape)}"
+        x = self
+        shape_diff = len(order) - len(x.shape)
         
-        return ops.Permute.apply(self, order=order)
+        if shape_diff > 0:
+            x = Tensor.pad_shapes(shape_diff, x)
+
+        return ops.Permute.apply(x, order=order)
 
     def transpose(self) -> Tensor:
-        # TODO: This is not correct, it should be (0, 1, ..., n, n - 1)
-        order = self.shape
-        return ops.Permute.apply(self)
+        x = self
+        shape_len = len(x.shape)
 
+        if shape_len < 2:
+            x = Tensor.pad_shapes(2 - shape_len, x)
+
+        order = [i for i in range(len(x.shape))]
+        order[-2], order[-1] = order[-1], order[-2]
+        return ops.Permute.apply(x, order=order)
+
+    # Reshape methods
+
+    # NOTE: these are different from the reshape() fn. These operations
+    # add/remove elements of the tensor whereas the reshape() fn just
+    # changes the shape without modifying the elements.
+    
+    def pad(self, new_shape: tuple[int, ...]) -> Tensor:
+        assert len(new_shape) >= len(self.shape), \
+            f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
+        assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+                f"Cannot pad, new shape expected type is tuple[int, ...] but got type{new_shape}."
+        x = self
+        shape_diff = len(new_shape) - len(x.shape)
+        
+        if shape_diff > 0:
+            x = Tensor.pad_shapes(shape_diff, x)
+
+        return ops.Pad.apply(x, new_shape=new_shape)
+
+    def shrink(self, new_shape: tuple[int, ...]) -> Tensor:
+        assert len(new_shape) <= len(self.shape), \
+            f"Cannot shrink, new shape dimensionality {new_shape} is greater than original one {self.shape}."
+        assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+                f"Cannot shrink, new shape expected type is tuple[int, ...] but got type{new_shape}."
+        x = self
+        shape_diff = len(new_shape) - len(x.shape)
+        
+        if shape_diff > 0:
+            x = Tensor.squeeze_shapes(shape_diff, x)
+
+        return ops.Shrink.apply(x, new_shape=new_shape)
+    
+    def expand(self, new_shape: tuple[int, ...]) -> Tensor:
+        assert len(new_shape) >= len(self.shape), \
+            f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
+        assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+                f"Cannot expand, new shape expected type is tuple[int, ...] but got type{new_shape}."
+        x = self
+        shape_diff = len(new_shape) - len(x.shape)
+        
+        if shape_diff > 0:
+            x = Tensor.pad_shapes(shape_diff, x)
+
+        for dim_idx, (new_dim, current_dim) in enumerate(zip(new_shape, x.shape)):
+            if new_dim > current_dim:
+                assert current_dim == 1, "Cannot expand along a non-singular dimension."
+                x = ops.Expand.apply(x, expansion_dim=dim_idx, expanded_size=new_dim)
+
+                # Without this, expand wouldn't care about the strides 
+                # of the new Tensor. This checks if the dimension we 
+                # are expanding across is the 0th dimension.
+                if dim_idx == len(new_shape) - 1:
+                    x = x.T
+        
+        return x
+    
     # Unary operations
 
     def neg(self) -> Tensor:
@@ -419,6 +480,16 @@ class Tensor:
         return id(self)
 
     # Utility
+
+    @staticmethod
+    def pad_shapes(shape_diff: int, x: Tensor) -> Tensor:
+        padded_shape = (1,) * shape_diff + x.shape
+        return ops.Reshape.apply(x, new_shape=padded_shape)
+
+    @staticmethod
+    def squeeze_shapes(shape_diff: int, x: Tensor) -> Tensor:
+        squeezed_shape = x.shape[shape_diff:]
+        return ops.Reshape.apply(x, new_shape=squeezed_shape)
 
     def is_scalar(self) -> bool:
         return self.data.is_scalar()

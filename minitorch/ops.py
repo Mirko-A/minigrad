@@ -8,7 +8,6 @@ from minitorch import helpers
 
 # Unary operations
 
-
 class Neg(Function):
     def forward(self, x: MiniBuffer) -> MiniBuffer: 
         return -x
@@ -44,7 +43,7 @@ class Sum(Function):
         return x.sum(dim)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.expand(self.input_shape[0], self.input_shape[1])
+        return chain_grad.expand(self.input_shape)
 
 # Binary operations
 
@@ -122,24 +121,6 @@ class Permute(Function):
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.permute(helpers.argsort(self.input_order))
 
-# NOTE: this is sum in reverse
-class Expand(Function):
-    def forward(self, x: MiniBuffer, rows: int, cols: int) -> MiniBuffer:        
-        expand_along_rows = rows > x.shape[0]
-        expand_along_cols = cols > x.shape[1]
-
-        if expand_along_rows and expand_along_cols:
-            self.reduce_dim = None # Reduce to scalar
-        elif expand_along_rows:
-            self.reduce_dim = 1 # Reduce to row vector
-        elif expand_along_cols:
-            self.reduce_dim = 0 # Reduce to col vector
-
-        return x.expand(rows, cols)
-
-    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.sum(self.reduce_dim)
-
 class Reshape(Function):
     def forward(self, x: MiniBuffer, new_shape: tuple[int, ...]) -> MiniBuffer:
         self.input_shape = x.shape
@@ -148,6 +129,44 @@ class Reshape(Function):
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.reshape(self.input_shape)
+
+# Reshape operations
+
+# NOTE: these are different from the Reshape movement operation. These operations
+# add/remove elements of the tensor whereas the Reshape operation just
+# changes the shape without modifying the elements.
+
+class Pad(Function):
+    def forward(self, x: MiniBuffer, new_shape: tuple[int, ...]) -> MiniBuffer:
+        self.input_shape = x.shape
+
+        return x.pad(new_shape)
+
+    # TODO: It makes sense that shrink is opposite of pad but this
+    # has not been checked!
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad.shrink(self.input_shape)
+
+class Shrink(Function):
+    def forward(self, x: MiniBuffer, new_shape: tuple[int, ...]) -> MiniBuffer:
+        self.input_shape = x.shape
+
+        return x.shrink(new_shape)
+
+    # TODO: It makes sense that pad is opposite of shrink but this
+    # has not been checked!
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad.pad(self.input_shape)
+
+# NOTE: this is sum in reverse
+class Expand(Function):
+    def forward(self, x: MiniBuffer, expansion_dim: int, expanded_size: int) -> MiniBuffer:
+        self.reduce_dim = expansion_dim
+
+        return x.expand(expansion_dim, expanded_size)
+
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad.sum(self.reduce_dim)
 
 # Activation functions
 
