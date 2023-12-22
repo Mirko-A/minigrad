@@ -7,7 +7,7 @@ import math
 from minitorch.buffer import MiniBuffer
 
 class Function:
-    def __init__(self, *inputs: Tensor) -> None:
+    def __init__(self, *inputs: Tensor):
         self.inputs_need_grad = [input.requires_grad for input in inputs]
         self.output_requires_grad = True if any(self.inputs_need_grad) else False
         if self.output_requires_grad:
@@ -32,12 +32,7 @@ class Function:
 import minitorch.ops as ops
 
 class Tensor:
-    # TODO: Try adding __slots__ for performance benchmarks
-    class Diagonal(Enum):
-        MAIN = 0
-        ANTI = 1
-
-    def __init__(self, data: float | int | list | MiniBuffer, requires_grad: bool = False) -> None:
+    def __init__(self, data: float | int | list | MiniBuffer, requires_grad: bool = False):
         if isinstance(data, MiniBuffer):
             self.data = data
         elif isinstance(data, float):
@@ -76,40 +71,31 @@ class Tensor:
     def ones(shape: tuple[int, ...], requires_grad: bool = False) -> Tensor:
         return Tensor.fill(shape, 1.0, requires_grad)
 
-    # TODO: Not implemented!!
     @staticmethod
     def randn(shape: tuple[int, ...], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
-        data = [[gauss(mean, std_dev) for _ in range(cols)] for _ in range(rows)]
+        data = [gauss(mean, std_dev) for _ in range(math.prod(shape))]
         return Tensor(data, requires_grad)
 
-    # TODO: Not implemented!!
     @staticmethod
     def uniform(shape: tuple[int, ...], low: float, high: float, requires_grad: bool = False) -> Tensor:
-        #data = [[uniform(low, high) for _ in range(cols)] for _ in range(rows)]
+        data = [uniform(low, high) for _ in range(math.prod(shape))]
         return Tensor(data, requires_grad)
 
     @staticmethod
-    def masked_fill(input: Tensor, mask: list[list[bool]], value: float) -> Tensor:
-        return Tensor(MiniBuffer.masked_fill(input, mask, value), input.requires_grad)
+    def masked_fill(input: Tensor, mask: list[bool], value: float) -> Tensor:
+        assert len(mask) == len(input.data), \
+               f"Cannot mask {input.shape} Tensor with mask of length {len(mask)}"
+        assert all(isinstance(mask_val, bool) for mask_val in mask), \
+               f"Invalid mask type provided. Expected list[bool]"
+        return Tensor(MiniBuffer.masked_fill(input.data, mask, value), input.requires_grad)
 
-    # TODO: Not implemented!!
     @staticmethod
     def replace(input: Tensor, target: float, new: float) -> Tensor:
-        out_data = []
-      
-        for row in input.data:
-            out_row = []
-
-            for value in row:
-                out_row.append(new if value == target else value)
-
-            out_data.append(out_row)
-
-        return Tensor(out_data, input.requires_grad)
+        return Tensor(MiniBuffer.replace(input, target, new), input.requires_grad)
     
     # TODO: Not implemented!!
     @staticmethod
-    def tril(input: Tensor, diagonal: Diagonal = Diagonal.MAIN) -> Tensor:
+    def tril(input: Tensor) -> Tensor:
         assert input.is_square(), "Cannot apply tril to non-square matrices."
       
         def tril_main_diagonal(input: Tensor) -> Tensor:
@@ -320,35 +306,6 @@ class Tensor:
     # Cost functions
     # TODO: Implement MSE, cross_entropy
 
-    # Broadcasting
-
-    def _broadcasted(self, y: Tensor) -> tuple[Tensor, Tensor]:
-        x: Tensor = self
-    
-        if (xshape:=x.shape) == (yshape:=y.shape):
-            return (x, y)
-        
-        shape_delta = len(xshape) - len(yshape)
-
-        if shape_delta > 0:
-            new_shape = (1,) * shape_delta + yshape 
-            y = y.reshape(new_shape)
-        elif shape_delta < 0:
-            new_shape = (1,) * -shape_delta + xshape 
-            x = x.reshape(new_shape)
-
-        if (xshape:=x.shape) == (yshape:=y.shape): 
-            return (x, y)
-    
-        shape_ret = tuple([max(x, y) for x, y in zip(xshape, yshape)])
-
-        if xshape != shape_ret: 
-            x = x.expand(shape_ret)
-        if yshape != shape_ret: 
-            y = y.expand(shape_ret)
-
-        return (x, y)
-
     # Backpropagation
 
     def toposort(self):
@@ -386,6 +343,35 @@ class Tensor:
             
             # TODO: Bring back if needed (needs __deletable__ = '_ctx'?)
             # del node._ctx
+
+    # Broadcasting
+
+    def _broadcasted(self, y: Tensor) -> tuple[Tensor, Tensor]:
+        x: Tensor = self
+    
+        if (xshape:=x.shape) == (yshape:=y.shape):
+            return (x, y)
+        
+        shape_delta = len(xshape) - len(yshape)
+
+        if shape_delta > 0:
+            new_shape = (1,) * shape_delta + yshape 
+            y = y.reshape(new_shape)
+        elif shape_delta < 0:
+            new_shape = (1,) * -shape_delta + xshape 
+            x = x.reshape(new_shape)
+
+        if (xshape:=x.shape) == (yshape:=y.shape): 
+            return (x, y)
+    
+        shape_ret = tuple([max(x, y) for x, y in zip(xshape, yshape)])
+
+        if xshape != shape_ret: 
+            x = x.expand(shape_ret)
+        if yshape != shape_ret: 
+            y = y.expand(shape_ret)
+
+        return (x, y)
 
     # Unary operator magic methods
 
@@ -458,17 +444,34 @@ class Tensor:
         return self.pow(other, True)
 
     def __matmul__(self, other):
-        assert isinstance(other, Tensor), f"Cannot perform Matrix multiplication with type {type(other)}"
+        assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
 
         return self.matmul(other)
     
     def __eq__(self, other):
         if isinstance(other, Tensor):
+            assert self.shape == other.shape, f"Cannot compare {self.shape} and {other.shape} Tensors. Shapes must match."
             return self.data.is_equal_to(other.data)
         elif isinstance(other, (int, float)):
+            if isinstance(other, int):
+                other = float(other)
             return self.data.is_elementwise_equal_to(other)
         else:
-            assert False, f"Invalid type for matrix equality: {type(other)}. Expected Matrix or float."
+            assert False, f"Invalid type for Tensor equality: {type(other)}. Expected Tensor, int or float."
+
+    def __lt__(self, other):
+        assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
+        if isinstance(other, int):
+            other = float(other)
+
+        return self.data.is_elementwise_less_than(other)
+    
+    def __gt__(self, other):
+        assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
+        if isinstance(other, int):
+            other = float(other)
+
+        return self.data.is_elementwise_greater_than(other)
 
     def __hash__(self):
         return id(self)

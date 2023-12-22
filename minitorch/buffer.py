@@ -23,10 +23,15 @@ class MiniBuffer:
         PAD = 0
         SHRINK = auto()
 
+    class CmpOp(Enum):
+        LT = 0
+        EQ = auto()
+        GT = auto()
+
     def __init__(self, 
                  data: list[float], 
                  shape: tuple[int, ...], 
-                 strides: Optional[tuple[int, ...]] = None) -> None:
+                 strides: Optional[tuple[int, ...]] = None):
         assert isinstance(data, list) and all(isinstance(value, float) for value in data), \
                 f"Cannot construct buffer. Expected data type is list[float] but got: {type(data)}."
         assert isinstance(shape, tuple) and all(isinstance(dim, int) for dim in shape), \
@@ -62,6 +67,18 @@ class MiniBuffer:
         return MiniBuffer([value] * total_elements, shape)
 
     @staticmethod
+    def replace(input: MiniBuffer, target: float, new: float) -> MiniBuffer:
+        out_data = []
+        
+        for val in input.data:
+            if val == target:
+                out_data.append(new)
+            else:
+                out_data.append(val)
+
+        return MiniBuffer(out_data, input.shape)
+
+    @staticmethod
     def full_like(input: MiniBuffer, value: float | int) -> MiniBuffer:
         if isinstance(value, int):
             value = float(value)
@@ -69,28 +86,18 @@ class MiniBuffer:
         return MiniBuffer.fill(input.shape, value)
 
     @staticmethod
-    def masked_fill(input: MiniBuffer, mask: list[list[bool]], value: float) -> MiniBuffer:
-        assert len(mask) == input.shape[0] and                              \
-               all(len(mask_row) == input.shape[1] for mask_row in mask),   \
-               "Input Matrix and mask must have the same dimensions."
-      
-        out_data = []
-
-        for in_row, mask_row in zip(input.data, mask):
-            out_data_row = []
-
-            for in_value, mask_value in zip(in_row, mask_row):
-                out_data_row.append(value if mask_value == True else in_value)
-
-            out_data.append(out_data_row)
-
-        return MiniBuffer(out_data)
+    def masked_fill(input: MiniBuffer, mask: list[bool], value: float) -> MiniBuffer:
+        return MiniBuffer._traverse_dims_and_masked_fill(0,
+                                                         0,
+                                                         mask,
+                                                         value,
+                                                         input)
     
     # Unary operations
 
     def neg(self) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, ),
                                                           MiniBuffer.UnaryOp.NEG,
                                                           self)
 
@@ -98,7 +105,7 @@ class MiniBuffer:
 
     def log(self) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, ),
                                                           MiniBuffer.UnaryOp.LOG,
                                                           self)
 
@@ -106,7 +113,7 @@ class MiniBuffer:
 
     def log2(self) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, ),
                                                           MiniBuffer.UnaryOp.LOG2,
                                                           self)
 
@@ -150,7 +157,7 @@ class MiniBuffer:
 
     def add(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, 0),
                                                           MiniBuffer.BinaryOp.ADD,
                                                           self, other)
 
@@ -158,7 +165,7 @@ class MiniBuffer:
     
     def sub(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, 0),
                                                           MiniBuffer.BinaryOp.SUB,
                                                           self, other)
 
@@ -166,7 +173,7 @@ class MiniBuffer:
 
     def mul(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, 0),
                                                           MiniBuffer.BinaryOp.MUL,
                                                           self, other)
     
@@ -174,7 +181,7 @@ class MiniBuffer:
     
     def div(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, 0),
                                                           MiniBuffer.BinaryOp.DIV,
                                                           self, other)
 
@@ -182,7 +189,7 @@ class MiniBuffer:
     
     def pow(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, 0),
                                                           MiniBuffer.BinaryOp.POW,
                                                           self, other)
 
@@ -190,90 +197,40 @@ class MiniBuffer:
     
     def max(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          0,
+                                                          (0, 0),
                                                           MiniBuffer.BinaryOp.MAX,
                                                           self, other)
 
         return MiniBuffer(out_data, self.shape)
     
+    # TODO: Equality functions are not working
+
     def is_equal_to(self, target: MiniBuffer) -> bool:
-        assert self.shape == target.shape, "Cannot compare Matrices if shape doesn't match."
+        return MiniBuffer._traverse_dims_and_compare(0,
+                                                     (0, 0),
+                                                     self,
+                                                     target)
 
-        for batch_idx in range(self.shape[0]):
-            for row_idx in range(self.shape[1]):
-                for col_idx in range(self.shape[2]):
-                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
-                    
-                    if self.data[position] != target.data[position]:
-                        return False
-
-        return True
-
-    def is_elementwise_greater_than(self, target: (int | float)) -> list[list[list[bool]]]:
-        if isinstance(target, int):
-            target = float(target)
-
-        out_data = []
-
-        for batch_idx in range(self.shape[0]):
-            out_batch = []
-
-            for row_idx in range(self.shape[1]):
-                out_row = []
-
-                for col_idx in range(self.shape[2]):
-                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
-                    out_row.append(self.data[position] > target)
-
-                out_batch.append(out_row)
-
-            out_data.append(out_batch)
-
-        return out_data
+    def is_elementwise_greater_than(self, target: float) -> list[bool]:
+        return MiniBuffer._traverse_dims_and_compare_elementwise(0,
+                                                                 0,
+                                                                 MiniBuffer.CmpOp.GT,
+                                                                 self,
+                                                                 target)
     
-    def is_elementwise_less_than(self, target: (int | float)) -> list[list[bool]]:
-        if isinstance(target, int):
-            target = float(target)
-
-        out_data = []
-
-        for batch_idx in range(self.shape[0]):
-            out_batch = []
-
-            for row_idx in range(self.shape[1]):
-                out_row = []
-
-                for col_idx in range(self.shape[2]):
-                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
-                    out_row.append(self.data[position] < target)
-
-                out_batch.append(out_row)
-
-            out_data.append(out_batch)
-
-        return out_data
+    def is_elementwise_less_than(self, target: float) -> list[bool]:
+        return MiniBuffer._traverse_dims_and_compare_elementwise(0,
+                                                                 0,
+                                                                 MiniBuffer.CmpOp.LT,
+                                                                 self,
+                                                                 target)
     
-    def is_elementwise_equal_to(self, target: (int | float)) -> list[list[bool]]:
-        if isinstance(target, int):
-            target = float(target)
-
-        out_data = []
-
-        for batch_idx in range(self.shape[0]):
-            out_batch = []
-
-            for row_idx in range(self.shape[1]):
-                out_row = []
-
-                for col_idx in range(self.shape[2]):
-                    position = batch_idx * self.strides[0] + row_idx * self.strides[1] + col_idx * self.strides[2] 
-                    out_row.append(self.data[position] == target)
-
-                out_batch.append(out_row)
-
-            out_data.append(out_batch)
-
-        return out_data
+    def is_elementwise_equal_to(self, target: float) -> list[bool]:
+        return MiniBuffer._traverse_dims_and_compare_elementwise(0,
+                                                                 0,
+                                                                 MiniBuffer.CmpOp.EQ,
+                                                                 self,
+                                                                 target)
 
     # Movemenet operations
 
@@ -381,6 +338,9 @@ class MiniBuffer:
     def __getitem__(self, key) -> list[float]:
         return self.data[key]
 
+    def __len__(self) -> int:
+        return len(self.data)
+
     def __repr__(self) -> str:
         repr = str("[")
 
@@ -413,7 +373,7 @@ class MiniBuffer:
     # This function iterates over the elements of all provided dimensions 
     # (taken from 'current_shape' which starts as the shape of the operand)
     # and performs the following:
-    #   Check if we've reached  the last dimension -> that's where the values
+    # Check if we've reached  the last dimension -> that's where the values
     # are! We iterate over the values and append them to the output list.
     # Otherwise, we iterate over the elements of the current (non-last)
     # dimension and recursively call this function with the depth_idx
@@ -422,55 +382,36 @@ class MiniBuffer:
     # which we can just append to the initial empty list.
     @staticmethod
     def _traverse_dims_and_apply_op(depth_idx: int,
-                                    current_position: int,
+                                    current_positions: tuple[int, ...],
                                     op: UnaryOp | BinaryOp,
                                     *operands: MiniBuffer) -> list[float]:
-        def apply_op_unary(op: MiniBuffer.UnaryOp, x: float) -> float:
-            if op == MiniBuffer.UnaryOp.NEG:
-                return -x
-            elif op == MiniBuffer.UnaryOp.LOG:
-                return math.log(x, math.e)
-            elif op == MiniBuffer.UnaryOp.LOG2:
-                return math.log(x, 2)
-            else:
-                assert False, f"Reshape operation {type(op)} is not supported."
-
-        def apply_op_binary(op: MiniBuffer.BinaryOp, x: float, y: float) -> MiniBuffer:
-            if op == MiniBuffer.BinaryOp.ADD:
-                return x + y
-            elif op == MiniBuffer.BinaryOp.SUB:
-                return x - y
-            elif op == MiniBuffer.BinaryOp.MUL:
-                return x * y
-            elif op == MiniBuffer.BinaryOp.DIV:
-                return x / y
-            elif op == MiniBuffer.BinaryOp.POW:
-                return x ** y
-            elif op == MiniBuffer.BinaryOp.MAX:
-                return max(x, y)
-            else:
-                assert False, f"Reshape operation {type(op)} is not supported."
-
         out_data = []
 
         if depth_idx == len(operands[0].shape) - 1:
             for val_idx in range(operands[0].shape[depth_idx]):
-                target_position = current_position + val_idx * operands[0].strides[depth_idx]
+                x_pos = current_positions[0] + val_idx * operands[0].strides[depth_idx]
             
                 if isinstance(op, MiniBuffer.UnaryOp):
-                    out_data.append(apply_op_unary(op, 
-                                                   operands[0].data[target_position]))
+                    out_data.append(MiniBuffer._apply_op_unary(op, 
+                                                               operands[0].data[x_pos]))
                 elif isinstance(op, MiniBuffer.BinaryOp):
-                    out_data.append(apply_op_binary(op, 
-                                                    operands[0].data[target_position],
-                                                    operands[1].data[target_position]))
+                    y_pos = current_positions[1] + val_idx * operands[1].strides[depth_idx]
+                    out_data.append(MiniBuffer._apply_op_binary(op, 
+                                                                operands[0].data[x_pos],
+                                                                operands[1].data[y_pos]))
                 else:
                     assert False, f"Invalid operation: {op}."
         else:
             for dim_idx in range(operands[0].shape[depth_idx]):
-                current_position = dim_idx * operands[0].strides[depth_idx]
+                x_pos = dim_idx * operands[0].strides[depth_idx]
+                current_pos = (x_pos, )
+
+                if isinstance(op, MiniBuffer.BinaryOp):
+                    y_pos = dim_idx * operands[1].strides[depth_idx]
+                    current_pos += (y_pos, )
+
                 out_data += MiniBuffer._traverse_dims_and_apply_op(depth_idx + 1,
-                                                                   current_position,
+                                                                   current_pos,
                                                                    op,
                                                                    *operands)
         
@@ -514,6 +455,115 @@ class MiniBuffer:
         return out_data
 
     @staticmethod
+    def _traverse_dims_and_compare(depth_idx: int,
+                                   current_position: tuple[int, int],
+                                   x: MiniBuffer,
+                                   target: MiniBuffer) -> bool:
+        if depth_idx == len(x.shape) - 1:
+            return MiniBuffer._compare(depth_idx,
+                                       current_position,
+                                       x,
+                                       target)
+        else:
+            for dim_idx in range(x.shape[depth_idx]):
+                x_pos = dim_idx * x.strides[depth_idx]
+                target_pos = dim_idx * target.strides[depth_idx]
+
+                return MiniBuffer._traverse_dims_and_compare(depth_idx + 1,
+                                                             (x_pos, target_pos),
+                                                             x,
+                                                             target)
+
+    @staticmethod
+    def _traverse_dims_and_compare_elementwise(depth_idx: int,
+                                               current_position: int,
+                                               op: CmpOp,
+                                               x: MiniBuffer,
+                                               target: float) -> bool:
+        out_data = []
+
+        if depth_idx == len(x.shape) - 1:
+            for val_idx in range(x.shape[depth_idx]):
+                pos = current_position + val_idx * x.strides[depth_idx]
+
+                if op == MiniBuffer.CmpOp.LT:
+                    out_data.append(x.data[pos] < target)
+                elif op == MiniBuffer.CmpOp.EQ:
+                    out_data.append(x.data[pos] == target)
+                elif op == MiniBuffer.CmpOp.GT:
+                    out_data.append(x.data[pos] > target)
+                else:
+                    assert False, f"Invalid operation: {op}."
+        else:
+            for dim_idx in range(x.shape[depth_idx]):
+                current_position = dim_idx * x.strides[depth_idx]
+                out_data += MiniBuffer._traverse_dims_and_compare_elementwise(depth_idx + 1,
+                                                                              current_position,
+                                                                              op,
+                                                                              x,
+                                                                              target)
+        
+        return out_data
+
+
+    @staticmethod
+    def _traverse_dims_and_masked_fill(depth_idx: int,
+                                       current_position: int,
+                                       mask: list[bool],
+                                       value: float,
+                                       x: MiniBuffer) -> list[float]:
+        out_data = []
+
+        if depth_idx == len(x.shape) - 1:
+            for val_idx in range(x.shape[depth_idx]):
+                pos = current_position + val_idx * x.strides[depth_idx]
+                should_fill = mask[pos]
+                
+                if should_fill:
+                    out_data.append(value)
+                else:
+                    out_data.append(x.data[pos])
+        else:
+            for dim_idx in range(x.shape[depth_idx]):
+                current_position = dim_idx * x.strides[depth_idx]
+                out_data += MiniBuffer._traverse_dims_and_masked_fill(depth_idx + 1,
+                                                                      current_position,
+                                                                      mask,
+                                                                      value,
+                                                                      x)
+        
+        return out_data
+
+
+    @staticmethod
+    def _apply_op_unary(op: MiniBuffer.UnaryOp, x: float) -> float:
+        if op == MiniBuffer.UnaryOp.NEG:
+            return -x
+        elif op == MiniBuffer.UnaryOp.LOG:
+            return math.log(x, math.e)
+        elif op == MiniBuffer.UnaryOp.LOG2:
+            return math.log(x, 2)
+        else:
+            assert False, f"Reshape operation {type(op)} is not supported."
+
+    @staticmethod
+    def _apply_op_binary(op: MiniBuffer.BinaryOp, x: float, y: float) -> MiniBuffer:
+        if op == MiniBuffer.BinaryOp.ADD:
+            return x + y
+        elif op == MiniBuffer.BinaryOp.SUB:
+            return x - y
+        elif op == MiniBuffer.BinaryOp.MUL:
+            return x * y
+        elif op == MiniBuffer.BinaryOp.DIV:
+            return x / y
+        elif op == MiniBuffer.BinaryOp.POW:
+            return x ** y
+        elif op == MiniBuffer.BinaryOp.MAX:
+            return max(x, y)
+        else:
+            assert False, f"Reshape operation {type(op)} is not supported."
+
+    @staticmethod
     def _pad(depth_idx: int,
              current_position: int,
              new_shape: tuple[int, ...],
@@ -546,20 +596,30 @@ class MiniBuffer:
         return current_dim
 
     @staticmethod
-    def _expand(current_shape: tuple[int, ...],
-                current_strides: tuple[int, ...],
-                current_position: int,
-                new_shape: tuple[int, ...],
-                current_data: list[float],
-                x: MiniBuffer) -> list[float]:
-        current_dim = []
+    def _compare(depth_idx: int,
+                 current_positions: tuple[int, int],
+                 x: MiniBuffer,
+                 target: MiniBuffer) -> bool:
+        for val_idx in range(x.shape[depth_idx]):
+            x_pos = current_positions[0] + val_idx * x.strides[depth_idx]
+            target_pos = current_positions[1] + val_idx * target.strides[depth_idx]
 
-        for val_idx in range(current_shape[0]):
-            target_position = current_position + val_idx * current_strides[0]
-            current_dim.append(x.data[target_position])
+            if x.data[x_pos] != target.data[target_pos]:
+                return False
 
-        if new_shape[0] > current_shape[0]:
-            current_dim *= new_shape[0]
+        return True
+
+    @staticmethod
+    def _compare_elementwise(depth_idx: int,
+                 current_position: int,
+                 op: CmpOp,
+                 x: MiniBuffer,
+                 target: MiniBuffer) -> bool:
+        for val_idx in range(x.shape[depth_idx]):
+            target_position = current_position + val_idx * x.strides[depth_idx]
+
+            if len(current_dim) < new_shape[depth_idx]:
+                current_dim.append(x.data[target_position])
 
         return current_dim
 
