@@ -121,37 +121,32 @@ class MiniBuffer:
 
     # Reduce operations
 
-    # TODO: Not implemented!!
-    def sum(self, dim: Optional[int] = None):
-        assert dim in MiniBuffer._VALID_DIM_VALUES + [None], "Invalid dimension value provided. Expected: None, 0 or 1."
-        
-        def sum_all(input: MiniBuffer) -> MiniBuffer:
-            out_data = 0.0
+    def sum(self, sum_dim: Optional[int] = None) -> MiniBuffer:
+        x = self
 
-            for row in input.data:
-                for value in row:
-                    out_data += value
-
-            return MiniBuffer([[out_data]])
-
-        def sum_along_dim(input: MiniBuffer, dim: int) -> MiniBuffer:
-            input = input if dim == 1 else input.T()
-            out_data = []
-
-            for row in input.data:
-                out_row = 0.0
-                
-                for value in row:
-                    out_row += value
-
-                out_data.append([out_row])
-
-            return MiniBuffer(out_data)
-
-        if dim is None:
-            return sum_all(self)
+        if sum_dim is None:
+            sum = sum(self.data)
+            return MiniBuffer([sum], (1,))
         else:
-            return sum_along_dim(self, dim)
+            # Same as input but with a 1 at the sum dimnesion index
+            out_shape = [1 if dim_idx == sum_dim else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
+            dim_order = [i for i in range(len(self.shape))]
+
+            # Permute so sum dimension is last
+            dim_order[sum_dim], dim_order[-1] = dim_order[-1], dim_order[sum_dim]
+            out_shape[sum_dim], out_shape[-1] = out_shape[-1], out_shape[sum_dim]
+            x = x.permute(dim_order)
+            
+            x = MiniBuffer(MiniBuffer._traverse_dims_and_sum_along_last(0,
+                                                                        0,
+                                                                        x), tuple(out_shape))
+            
+            # Permute back to original
+            dim_order[sum_dim], dim_order[-1] = dim_order[-1], dim_order[sum_dim]
+            out_shape[sum_dim], out_shape[-1] = out_shape[-1], out_shape[sum_dim]
+            x = x.permute(dim_order)
+            
+            return MiniBuffer(x.data, tuple(out_shape))
 
     # Binary operations
 
@@ -363,7 +358,7 @@ class MiniBuffer:
             # Stride for each dimension is calculated by taking the product 
             # of all the dimension sizes (shapes) proceeding it. The last
             # dimension always has a stride of 1.
-            if dim_idx == shape_len:
+            if dim_idx == (shape_len - 1):
                 strides += (1,)
             else:
                 strides += (math.prod(shape[dim_idx + 1:]),)
@@ -389,25 +384,25 @@ class MiniBuffer:
 
         if depth_idx == len(operands[0].shape) - 1:
             for val_idx in range(operands[0].shape[depth_idx]):
-                x_pos = current_positions[0] + val_idx * operands[0].strides[depth_idx]
+                x_val_pos = current_positions[0] + val_idx * operands[0].strides[depth_idx]
             
                 if isinstance(op, MiniBuffer.UnaryOp):
                     out_data.append(MiniBuffer._apply_op_unary(op, 
-                                                               operands[0].data[x_pos]))
+                                                               operands[0].data[x_val_pos]))
                 elif isinstance(op, MiniBuffer.BinaryOp):
-                    y_pos = current_positions[1] + val_idx * operands[1].strides[depth_idx]
+                    y_val_pos = current_positions[1] + val_idx * operands[1].strides[depth_idx]
                     out_data.append(MiniBuffer._apply_op_binary(op, 
-                                                                operands[0].data[x_pos],
-                                                                operands[1].data[y_pos]))
+                                                                operands[0].data[x_val_pos],
+                                                                operands[1].data[y_val_pos]))
                 else:
                     assert False, f"Invalid operation: {op}."
         else:
             for dim_idx in range(operands[0].shape[depth_idx]):
-                x_pos = dim_idx * operands[0].strides[depth_idx]
+                x_pos = current_positions[0] + dim_idx * operands[0].strides[depth_idx]
                 current_pos = (x_pos, )
 
                 if isinstance(op, MiniBuffer.BinaryOp):
-                    y_pos = dim_idx * operands[1].strides[depth_idx]
+                    y_pos = current_positions[1] + dim_idx * operands[1].strides[depth_idx]
                     current_pos += (y_pos, )
 
                 out_data += MiniBuffer._traverse_dims_and_apply_op(depth_idx + 1,
@@ -415,6 +410,30 @@ class MiniBuffer:
                                                                    op,
                                                                    *operands)
         
+        return out_data
+
+    @staticmethod
+    def _traverse_dims_and_sum_along_last(depth_idx: int,
+                                          current_position: int,
+                                          x: MiniBuffer) -> list[float]:
+        out_data = []
+
+        if depth_idx == len(x.shape) - 1:
+            sum = 0.0
+
+            for val_idx in range(x.shape[depth_idx]):
+                val_pos = current_position + val_idx * x.strides[depth_idx]
+                sum += x.data[val_pos]
+
+            out_data.append(sum)
+        else:
+            for dim_idx in range(x.shape[depth_idx]):
+                x_pos = current_position +  dim_idx * x.strides[depth_idx]
+
+                out_data += MiniBuffer._traverse_dims_and_sum_along_last(depth_idx + 1,
+                                                                         x_pos,
+                                                                         x)
+
         return out_data
 
     # Reshape ops are different from the reshape() fn. These operations
@@ -445,9 +464,9 @@ class MiniBuffer:
             out_data += current_dim
         else:
             for dim_idx in range(new_shape[depth_idx]):
-                current_position = dim_idx * x.strides[depth_idx]
+                x_pos = current_position + dim_idx * x.strides[depth_idx]
                 out_data += MiniBuffer._traverse_dims_and_apply_reshape_op(depth_idx + 1,
-                                                                           current_position,
+                                                                           x_pos,
                                                                            op,
                                                                            new_shape,
                                                                            x)
@@ -466,7 +485,7 @@ class MiniBuffer:
                                        target)
         else:
             for dim_idx in range(x.shape[depth_idx]):
-                x_pos = dim_idx * x.strides[depth_idx]
+                x_pos = current_position + dim_idx * x.strides[depth_idx]
                 target_pos = dim_idx * target.strides[depth_idx]
 
                 return MiniBuffer._traverse_dims_and_compare(depth_idx + 1,
@@ -484,21 +503,21 @@ class MiniBuffer:
 
         if depth_idx == len(x.shape) - 1:
             for val_idx in range(x.shape[depth_idx]):
-                pos = current_position + val_idx * x.strides[depth_idx]
+                val_pos = current_position + val_idx * x.strides[depth_idx]
 
                 if op == MiniBuffer.CmpOp.LT:
-                    out_data.append(x.data[pos] < target)
+                    out_data.append(x.data[val_pos] < target)
                 elif op == MiniBuffer.CmpOp.EQ:
-                    out_data.append(x.data[pos] == target)
+                    out_data.append(x.data[val_pos] == target)
                 elif op == MiniBuffer.CmpOp.GT:
-                    out_data.append(x.data[pos] > target)
+                    out_data.append(x.data[val_pos] > target)
                 else:
                     assert False, f"Invalid operation: {op}."
         else:
             for dim_idx in range(x.shape[depth_idx]):
-                current_position = dim_idx * x.strides[depth_idx]
+                x_pos = current_position + dim_idx * x.strides[depth_idx]
                 out_data += MiniBuffer._traverse_dims_and_compare_elementwise(depth_idx + 1,
-                                                                              current_position,
+                                                                              x_pos,
                                                                               op,
                                                                               x,
                                                                               target)
@@ -516,24 +535,23 @@ class MiniBuffer:
 
         if depth_idx == len(x.shape) - 1:
             for val_idx in range(x.shape[depth_idx]):
-                pos = current_position + val_idx * x.strides[depth_idx]
-                should_fill = mask[pos]
+                val_pos = current_position + val_idx * x.strides[depth_idx]
+                should_fill = mask[val_pos]
                 
                 if should_fill:
                     out_data.append(value)
                 else:
-                    out_data.append(x.data[pos])
+                    out_data.append(x.data[val_pos])
         else:
             for dim_idx in range(x.shape[depth_idx]):
-                current_position = dim_idx * x.strides[depth_idx]
+                x_pos = current_position + dim_idx * x.strides[depth_idx]
                 out_data += MiniBuffer._traverse_dims_and_masked_fill(depth_idx + 1,
-                                                                      current_position,
+                                                                      x_pos,
                                                                       mask,
                                                                       value,
                                                                       x)
         
         return out_data
-
 
     @staticmethod
     def _apply_op_unary(op: MiniBuffer.UnaryOp, x: float) -> float:
@@ -610,20 +628,6 @@ class MiniBuffer:
         return True
 
     @staticmethod
-    def _compare_elementwise(depth_idx: int,
-                 current_position: int,
-                 op: CmpOp,
-                 x: MiniBuffer,
-                 target: MiniBuffer) -> bool:
-        for val_idx in range(x.shape[depth_idx]):
-            target_position = current_position + val_idx * x.strides[depth_idx]
-
-            if len(current_dim) < new_shape[depth_idx]:
-                current_dim.append(x.data[target_position])
-
-        return current_dim
-
-    @staticmethod
     def _traverse_dims_and_repr(depth_idx: int,
                                 current_position: int,
                                 x: MiniBuffer) -> str:
@@ -631,12 +635,12 @@ class MiniBuffer:
 
         if depth_idx == len(x.shape) - 1:
             for val_idx in range(x.shape[depth_idx]):
-                target_position = current_position + val_idx * x.strides[depth_idx]
+                val_pos = current_position + val_idx * x.strides[depth_idx]
             
                 if val_idx == (x.shape[depth_idx] - 1):
-                    repr += f"{x.data[target_position]:.4f}"
+                    repr += f"{x.data[val_pos]:.4f}"
                 else:
-                    repr += f"{x.data[target_position]:.4f}, "
+                    repr += f"{x.data[val_pos]:.4f}, "
         else:
             for dim_idx in range(x.shape[depth_idx]):
                 # Check if we are at the beginning of the current dimension.
@@ -656,9 +660,9 @@ class MiniBuffer:
                         
                     repr += "           ["
 
-                current_position = dim_idx * x.strides[depth_idx]
+                x_pos = current_position + dim_idx * x.strides[depth_idx]
                 repr += MiniBuffer._traverse_dims_and_repr(depth_idx + 1,
-                                                           current_position,
+                                                           x_pos,
                                                            x)
         
                 if dim_idx == (x.shape[depth_idx] - 1):

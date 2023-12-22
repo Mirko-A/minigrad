@@ -37,10 +37,10 @@ class Log2(Function):
 # Reduce operations
 
 class Sum(Function):
-    def forward(self, x: MiniBuffer, dim: Optional[int] = None):
+    def forward(self, x: MiniBuffer, sum_dim: Optional[int] = None):
         self.input_shape = x.shape
 
-        return x.sum(dim)
+        return x.sum(sum_dim)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.expand(self.input_shape)

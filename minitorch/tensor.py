@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import Optional, Type
 from random import gauss, uniform
-from enum import Enum
 import math
 
 from minitorch.buffer import MiniBuffer
+from minitorch import helpers
 
 class Function:
     def __init__(self, *inputs: Tensor):
@@ -72,13 +72,17 @@ class Tensor:
         return Tensor.fill(shape, 1.0, requires_grad)
 
     @staticmethod
+    def arange(start: int, end: int, requires_grad: bool = False):
+        return Tensor([i for i in range(start, end)], requires_grad)
+
+    @staticmethod
     def randn(shape: tuple[int, ...], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
-        data = [gauss(mean, std_dev) for _ in range(math.prod(shape))]
+        data = MiniBuffer([gauss(mean, std_dev) for _ in range(math.prod(shape))], shape)
         return Tensor(data, requires_grad)
 
     @staticmethod
     def uniform(shape: tuple[int, ...], low: float, high: float, requires_grad: bool = False) -> Tensor:
-        data = [uniform(low, high) for _ in range(math.prod(shape))]
+        data = data = MiniBuffer([uniform(low, high) for _ in range(math.prod(shape))], shape)
         return Tensor(data, requires_grad)
 
     @staticmethod
@@ -136,11 +140,10 @@ class Tensor:
 
     # Movement methods
 
-    def reshape(self, new_shape: tuple[int, ...]) -> Tensor:
-        assert math.prod(self.shape) == math.prod(new_shape), \
-            f"Cannot reshape Tensor, new dimensions: {new_shape} don't match the current shape {self.shape}."
-        
-        return ops.Reshape.apply(self, new_shape=new_shape)
+    def reshape(self, new_shape: tuple[int, ...], *args) -> Tensor:
+        new_shape = helpers.argfix(new_shape, *args)
+        assert 0 not in new_shape, f"zeros not allowed in shape {new_shape}"
+        return ops.Reshape.apply(self, new_shape=tuple([-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape]))
     
     def flatten(self) -> Tensor:
         total_elements = math.prod(self.shape)
@@ -232,9 +235,15 @@ class Tensor:
     
     # Reduce operations
 
-    # TODO: Not implemented!!
-    def sum(self, dim: Optional[int] = None) -> Tensor:
-        return ops.Sum.apply(self, dim=dim)
+    def sum(self, sum_dim: Optional[int] = None) -> Tensor:
+        if sum_dim is not None:
+            assert isinstance(sum_dim, int), f"Cannot sum Tensor, invalid dimension provided. Expected int but got {type(sum_dim)}."
+            assert sum_dim < len(self.shape), f"Cannot sum Tensor, invalid dimension provided. Tensor shape is {self.shape} but {sum_dim}th dimension was provided."
+        
+            if sum_dim < 0:
+                sum_dim = len(self.shape) + sum_dim
+
+        return ops.Sum.apply(self, sum_dim=sum_dim)
 
     # Binary operations
 
@@ -281,18 +290,18 @@ class Tensor:
     def exp(self) -> Tensor:
         return math.e ** self
 
-    # TODO: This does not calculate gradients
-    def dot(self, other: Tensor) -> Tensor:
-        x, y = self, other
-        result_shape = (x.shape[0], y.shape[1])
-
-        return (x * y.T().flatten().T()).reshape(result_shape[0], result_shape[1])
-
     # TODO: Not implemented!!
     def matmul(self, other: Tensor) -> Tensor:
-        assert self.shape[1] == other.shape[0], "Cannot perform Matrix multiplication. Inner dimensions do not match."
-
-        return self.dot(other)
+        x, y = self, other
+        n1, n2 = len(x.shape), len(y.shape)
+        
+        assert n1 != 0 and n2 != 0, \
+            f"both arguments to matmul need to be at least 1D, but they are {n1}D and {n2}D"
+        assert x.shape[-1] == y.shape[-min(n2, 2)], \
+            f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-min(n2, 2)]})"
+        
+        # TODO: matmul logic
+        assert False, "Not implemented"
 
     # Activation functions
     # TODO: Implement tanh, softmax
