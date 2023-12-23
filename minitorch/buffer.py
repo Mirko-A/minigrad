@@ -145,12 +145,12 @@ class MiniBuffer:
                                                                         x), tuple(out_shape))
             
             # Permute back to original
-            dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
             out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
-            x = x.permute(dim_order)
-            
-            return MiniBuffer(x.data, tuple(out_shape))
+            result = x.permute(dim_order)
 
+            # Hack to make a contiguous MiniBuffer again
+            return (result + MiniBuffer.full_like(result, 0))
+        
     # Binary operations
 
     def add(self, other: MiniBuffer) -> MiniBuffer:
@@ -249,7 +249,10 @@ class MiniBuffer:
             new_dims += (self.shape[ord],)
             new_strides += (self.strides[ord],)
 
-        return MiniBuffer(self.data, new_dims, strides=new_strides)
+        result = MiniBuffer(self.data, new_dims, strides=new_strides)
+
+        # Hack to make a contiguous MiniBuffer again
+        return (result + MiniBuffer.full_like(result, 0))
 
     # Reshape methods
     
@@ -299,7 +302,10 @@ class MiniBuffer:
         corrected_input_shape = [1 if i == expansion_axis else self.shape[i] for i in range(len(self.shape))]
         out_strides[expansion_axis] = math.prod(corrected_input_shape)
 
-        return MiniBuffer(out_data, tuple(out_shape), tuple(out_strides))
+        result = MiniBuffer(out_data, tuple(out_shape), tuple(out_strides))
+
+        # Hack to make a contiguous MiniBuffer again
+        return (result + MiniBuffer.full_like(result, 0))
 
     # Unary operator magic methods
 
@@ -602,7 +608,7 @@ class MiniBuffer:
         for val_idx in range(new_shape[depth_idx]):
             target_position = current_position + val_idx * x.strides[depth_idx]
                 
-            if val_idx <= x.shape[depth_idx] and target_position < len(x.data):
+            if val_idx < x.shape[depth_idx] and target_position < len(x.data):
                 current_dim.append(x.data[target_position])
             else:
                 current_dim.append(0.0)
