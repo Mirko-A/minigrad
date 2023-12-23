@@ -249,13 +249,10 @@ class Tensor:
             if sum_axis < 0:
                 sum_axis = len(self.shape) + sum_axis
 
-        if sum_axis is None:
-            shape_squeezed = (1,)
-        else:
-            shape_squeezed = [s for i,s in enumerate(self.shape) if i != sum_axis]
+        shape_squeezed = [s for i,s in enumerate(self.shape) if i != sum_axis]
+        sum_res = ops.Sum.apply(self, sum_axis=sum_axis)
         
-        sum = ops.Sum.apply(self, sum_axis=sum_axis)
-        return sum if keepdims else ops.Reshape.apply(sum, new_shape=tuple(shape_squeezed))
+        return sum_res if keepdims or sum_axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
 
     # Binary operations
 
