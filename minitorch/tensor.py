@@ -241,7 +241,7 @@ class Tensor:
     
     # Reduce operations
 
-    def sum(self, sum_axis: Optional[int] = None) -> Tensor:
+    def sum(self, sum_axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         if sum_axis is not None:
             assert isinstance(sum_axis, int), f"Cannot sum Tensor, invalid axis provided. Expected int but got {type(sum_axis)}."
             assert sum_axis < len(self.shape), f"Cannot sum Tensor, invalid axis provided. Tensor shape is {self.shape} but {sum_axis}th dimension was provided."
@@ -249,7 +249,9 @@ class Tensor:
             if sum_axis < 0:
                 sum_axis = len(self.shape) + sum_axis
 
-        return ops.Sum.apply(self, sum_axis=sum_axis)
+        shape_squeezed = [s for i,s in enumerate(self.shape) if i != sum_axis]
+        sum = ops.Sum.apply(self, sum_axis=sum_axis)
+        return sum if keepdims else ops.Reshape.apply(sum, new_shape=tuple(shape_squeezed))
 
     # Binary operations
 
