@@ -121,20 +121,20 @@ class MiniBuffer:
 
     # Reduce operations
 
-    def sum(self, sum_dim: Optional[int] = None) -> MiniBuffer:
+    def sum(self, sum_axis: Optional[int] = None) -> MiniBuffer:
         x = self
 
-        if sum_dim is None:
+        if sum_axis is None:
             sum = sum(self.data)
             return MiniBuffer([sum], (1,))
         else:
             # Same as input but with a 1 at the sum dimnesion index
-            out_shape = [1 if dim_idx == sum_dim else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
+            out_shape = [1 if dim_idx == sum_axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
             dim_order = [i for i in range(len(self.shape))]
 
             # Permute so sum dimension is last
-            dim_order[sum_dim], dim_order[-1] = dim_order[-1], dim_order[sum_dim]
-            out_shape[sum_dim], out_shape[-1] = out_shape[-1], out_shape[sum_dim]
+            dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
+            out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
             x = x.permute(dim_order)
             
             x = MiniBuffer(MiniBuffer._traverse_dims_and_sum_along_last(0,
@@ -142,8 +142,8 @@ class MiniBuffer:
                                                                         x), tuple(out_shape))
             
             # Permute back to original
-            dim_order[sum_dim], dim_order[-1] = dim_order[-1], dim_order[sum_dim]
-            out_shape[sum_dim], out_shape[-1] = out_shape[-1], out_shape[sum_dim]
+            dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
+            out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
             x = x.permute(dim_order)
             
             return MiniBuffer(x.data, tuple(out_shape))
@@ -274,21 +274,29 @@ class MiniBuffer:
 
     # TODO: Kinda works. Need to figure out new strides as
     # they are currently not affected by this fn.
-    def expand(self, expansion_dim: int, expanded_size: int) -> MiniBuffer:
-        out_shape = [dim for dim in self.shape]
-        out_shape[expansion_dim] = expanded_size
-        out_shape = tuple(out_shape)
-
-        # Without this, expand wouldn't care about the strides 
-        # of the new Tensor. This checks if the dimension we 
-        # are expanding across is the 0th dimension.
-        out_strides = [stride for stride in MiniBuffer.get_strides_from_shape(out_shape)]
-        out_strides[-2], out_strides[-1] = out_strides[-1], out_strides[-2]
-        out_strides = tuple(out_strides)
-
+    def expand(self, expansion_axis: int, expanded_size: int) -> MiniBuffer:
         out_data = self.data * expanded_size
 
-        return MiniBuffer(out_data, out_shape, out_strides)
+        out_shape = [dim for dim in self.shape]
+        out_shape[expansion_axis] = expanded_size
+
+        # NOTE: Since we're just multiplying the data array
+        # by expanded_size, somehow we need to preserve the
+        # meaning of the original shape and strides. Other-
+        # wise, expanding a 1x3 and a 3x1 tensor would res-
+        # ult in the same output, which is wrong.
+        # The correct strides for the output are same as
+        # the input strides, with the stride at position
+        # pos=expansion_axis being the product of all dims
+        # of the original shape except the one we're expan-
+        # ding along. This makes sense because we expand by
+        # simply duplicating the original data expanded_size
+        # times.
+        out_strides = [stride for stride in self.strides]
+        corrected_input_shape = [1 if i == expansion_axis else self.shape[i] for i in range(len(self.shape))]
+        out_strides[expansion_axis] = math.prod(corrected_input_shape)
+
+        return MiniBuffer(out_data, tuple(out_shape), tuple(out_strides))
 
     # Unary operator magic methods
 

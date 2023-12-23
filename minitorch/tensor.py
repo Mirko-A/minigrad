@@ -139,10 +139,16 @@ class Tensor:
         return output
 
     # Movement methods
-
+    
+    # NOTE: The way this version of reshape (with *args) works
+    # isn't super clear, it was simply stolen from tinygrad. 
+    # The original had just the new shape and it applied the
+    # Reshape operation on it. The current version was taken
+    # from tinygrad because it is needed for matmul.
     def reshape(self, new_shape: tuple[int, ...], *args) -> Tensor:
         new_shape = helpers.argfix(new_shape, *args)
         assert 0 not in new_shape, f"zeros not allowed in shape {new_shape}"
+        
         return ops.Reshape.apply(self, new_shape=tuple([-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape]))
     
     def flatten(self) -> Tensor:
@@ -161,7 +167,7 @@ class Tensor:
 
         return ops.Permute.apply(x, order=order)
 
-    def transpose(self) -> Tensor:
+    def transpose(self, axis0 = -2, axis1 = -1) -> Tensor:
         x = self
         shape_len = len(x.shape)
 
@@ -169,7 +175,7 @@ class Tensor:
             x = Tensor.pad_shapes(2 - shape_len, x)
 
         order = [i for i in range(len(x.shape))]
-        order[-2], order[-1] = order[-1], order[-2]
+        order[axis0], order[axis1] = order[axis1], order[axis0]
         return ops.Permute.apply(x, order=order)
 
     # Reshape methods
@@ -218,7 +224,7 @@ class Tensor:
         for dim_idx, (new_dim, current_dim) in enumerate(zip(new_shape, x.shape)):
             if new_dim > current_dim:
                 assert current_dim == 1, "Cannot expand along a non-singular dimension."
-                x = ops.Expand.apply(x, expansion_dim=dim_idx, expanded_size=new_dim)
+                x = ops.Expand.apply(x, expansion_axis=dim_idx, expanded_size=new_dim)
         
         return x
     
@@ -235,15 +241,15 @@ class Tensor:
     
     # Reduce operations
 
-    def sum(self, sum_dim: Optional[int] = None) -> Tensor:
-        if sum_dim is not None:
-            assert isinstance(sum_dim, int), f"Cannot sum Tensor, invalid dimension provided. Expected int but got {type(sum_dim)}."
-            assert sum_dim < len(self.shape), f"Cannot sum Tensor, invalid dimension provided. Tensor shape is {self.shape} but {sum_dim}th dimension was provided."
+    def sum(self, sum_axis: Optional[int] = None) -> Tensor:
+        if sum_axis is not None:
+            assert isinstance(sum_axis, int), f"Cannot sum Tensor, invalid axis provided. Expected int but got {type(sum_axis)}."
+            assert sum_axis < len(self.shape), f"Cannot sum Tensor, invalid axis provided. Tensor shape is {self.shape} but {sum_axis}th dimension was provided."
         
-            if sum_dim < 0:
-                sum_dim = len(self.shape) + sum_dim
+            if sum_axis < 0:
+                sum_axis = len(self.shape) + sum_axis
 
-        return ops.Sum.apply(self, sum_dim=sum_dim)
+        return ops.Sum.apply(self, sum_axis=sum_axis)
 
     # Binary operations
 
@@ -295,13 +301,25 @@ class Tensor:
         x, y = self, other
         n1, n2 = len(x.shape), len(y.shape)
         
-        assert n1 != 0 and n2 != 0, \
-            f"both arguments to matmul need to be at least 1D, but they are {n1}D and {n2}D"
-        assert x.shape[-1] == y.shape[-min(n2, 2)], \
-            f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-min(n2, 2)]})"
+        assert n1 > 1 and n2 > 1, \
+            f"both arguments to matmul need to be at least 2D, but they are {n1}D and {n2}D"
+        assert x.shape[-1] == y.shape[-2], \
+            f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-2]})"
         
-        # TODO: matmul logic
-        assert False, "Not implemented"
+        # NOTE: This last part isn't super clear, it was simply
+        # stolen from tinygrad. But my guess is that it is an
+        # n-dimensional analogy to the way you can perfom matrix
+        # multiplication between A[m, n] and B[n, p] by performing
+        # the following operations:
+        # 1) A = reshape(A, (1, m, n))
+        # 2) B = reshape(B, (n, p, 1))
+        # 3) B = transpose(B)
+        # 4) C = (A*B).sum(-1)
+        x = self.reshape(*self.shape[0:-1], *[1]*min(n1-1, n2-1, 1), self.shape[-1])
+        y = y.reshape(*y.shape[0:-2], *[1]*min(n1-1, n2-1, 1), *y.shape[-2:]).transpose()
+
+        return (x*y).sum(-1)
+
 
     # Activation functions
     # TODO: Implement tanh, softmax
@@ -380,6 +398,8 @@ class Tensor:
         if yshape != shape_ret: 
             y = y.expand(shape_ret)
 
+        #print(x)
+        #print(y)
         return (x, y)
 
     # Unary operator magic methods
