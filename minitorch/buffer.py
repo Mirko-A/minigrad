@@ -125,14 +125,14 @@ class MiniBuffer:
         x = self
 
         if sum_axis is None:
-            sum = sum(self.data)
-            return MiniBuffer([sum], (1,))
+            sum_full = sum(self.data)
+            return MiniBuffer([sum_full], (1,))
         else:
-            # Same as input but with a 1 at the sum dimnesion index
+            # Same as input but with a 1 at the sum axis index
             out_shape = [1 if dim_idx == sum_axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
             dim_order = [i for i in range(len(self.shape))]
 
-            # Permute so sum dimension is last
+            # Permute so sum axis is last
             dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
             out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
             x = x.permute(dim_order)
