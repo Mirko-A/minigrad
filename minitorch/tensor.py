@@ -184,6 +184,7 @@ class Tensor:
     # add/remove elements of the tensor whereas the reshape() fn just
     # changes the shape without modifying the elements.
     
+    # TODO: There is a bug in pad (try padding 3x3 -> 5x5)
     def pad(self, new_shape: tuple[int, ...]) -> Tensor:
         assert len(new_shape) >= len(self.shape), \
             f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
@@ -401,8 +402,6 @@ class Tensor:
         if yshape != shape_ret: 
             y = y.expand(shape_ret)
 
-        #print(x)
-        #print(y)
         return (x, y)
 
     # Unary operator magic methods
@@ -528,58 +527,6 @@ class Tensor:
 
     def __repr__(self) -> str:
         return f"<Tensor:  {self.data} with grad {self.grad.data if self.grad else None}>"
-
-#     @staticmethod
-#     def cat(matrices: list[Matrix], dim: int = 0) -> Matrix:
-#         assert dim in Matrix._VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
-#         assert all(isinstance(m, Matrix) for m in matrices), f"Cannot concatenate Matrix with other data types."
-
-#         def cat_rows(matrices: list[Matrix]) -> Matrix:
-#             rows = matrices[0].shape.row
-#             requires_grad = matrices[0].requires_grad
-#             assert all(m.shape.row == rows and m.requires_grad == requires_grad for m in matrices)
-
-#             out_data = []
-
-#             for row in range(rows):
-#                 out_row = sum((m[row] for m in matrices), [])
-#                 out_data.append(out_row)
-
-#             return Matrix(out_data, requires_grad)
-
-#         def cat_cols(matrices: list[Matrix]) -> Matrix:
-#             cols = matrices[0].shape.col 
-#             requires_grad = matrices[0].requires_grad
-#             assert all(m.shape.row == cols and m.requires_grad == requires_grad for m in matrices)
-
-#             out_data = [row for m in matrices for row in m.data]
-#             return Matrix(out_data, requires_grad)
-
-#         if dim == 0:
-#             return cat_cols(matrices)
-#         else:
-#             return cat_rows(matrices)
-
-#     def softmax(self, dim: int = 0):
-#         assert dim in Matrix._VALID_DIM_VALUES, "Invalid dimension value provided. Expected: 0 or 1."
-
-#         input = self if dim == 1 else self.T()
-#         input_exp = input.exp()
-#         input_exp_sums = input_exp.sum(dim=1).item()
-#         out_data = []
-        
-#         for row_exp, row_exp_sum in zip(input_exp.data, input_exp_sums):
-#             out_row = []
-
-#             for value_exp in row_exp:
-#                 probability = value_exp / row_exp_sum
-#                 out_row.append(probability)
-
-#             out_data.append(out_row)
-
-#         out_mat = Matrix(out_data, self.requires_grad)
-
-#         return out_mat if dim == 1 else out_mat.T()
 
 #     # Cost functions
     

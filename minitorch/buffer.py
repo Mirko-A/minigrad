@@ -121,6 +121,9 @@ class MiniBuffer:
 
     # Reduce operations
 
+    # TODO: For some reason this doesn't work on 4D and higher
+    # tensors...Anyway we're not going to use those but it bugs
+    # me and I wanna know why it happens. 
     def sum(self, sum_axis: Optional[int] = None) -> MiniBuffer:
         x = self
 
