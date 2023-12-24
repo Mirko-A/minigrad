@@ -32,17 +32,19 @@ class Function:
 import minitorch.ops as ops
 
 class Tensor:
+    __deletable__ = ('_ctx',)
+
     def __init__(self, data: float | int | list | MiniBuffer, requires_grad: bool = False):
         if isinstance(data, MiniBuffer):
             self.data = data
         elif isinstance(data, float):
-            self.data = MiniBuffer(data, (1,))
+            self.data = MiniBuffer([data], (1,))
         elif isinstance(data, int):
             self.data = MiniBuffer([float(data)], (1,))
         elif isinstance(data, list):
             self.data = MiniBuffer.np_load(data)
         else:
-            assert False, "Cannot construct Tensor3D with given data. Expected: int | float | list(nested) | MiniBuffer."
+            assert False, f"Cannot construct Tensor3D with given data: {type(data)}. Expected: int | float | list(nested) | MiniBuffer."
         self.requires_grad = requires_grad
         self.grad: Optional[Tensor] = None
         # Internal variable used for autograd graph construction
@@ -114,11 +116,11 @@ class Tensor:
     # Reshape operation on it. The current version was taken
     # from tinygrad because it is needed for matmul.
     def reshape(self, new_shape: tuple[int, ...], *args) -> Tensor:
-        assert math.prod(new_shape) == math.prod(self.shape), \
-            f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(new_shape)} != {math.prod(self.shape)})."
         new_shape = helpers.argfix(new_shape, *args)
         assert 0 not in new_shape, \
             f"Zeros not allowed in shape ({new_shape})."
+        assert math.prod(new_shape) == math.prod(self.shape), \
+            f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(new_shape)} != {math.prod(self.shape)})."
         
         return ops.Reshape.apply(self, new_shape=tuple([-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape]))
     
@@ -214,17 +216,27 @@ class Tensor:
     # Reduce operations
 
     def sum(self, sum_axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
-        if sum_axis is not None:
+        x = self
+
+        def _sum(input: Tensor, sum_axis: int, keepdims: bool) -> Tensor:
             assert isinstance(sum_axis, int), f"Cannot sum Tensor, invalid axis provided. Expected int but got {type(sum_axis)}."
-            assert sum_axis < len(self.shape), f"Cannot sum Tensor, invalid axis provided. Tensor shape is {self.shape} but {sum_axis}th dimension was provided."
+            assert abs(sum_axis) < len(input.shape), f"Cannot sum Tensor, invalid axis provided. Tensor shape is {input.shape} but {sum_axis}th dimension was provided."
         
             if sum_axis < 0:
-                sum_axis = len(self.shape) + sum_axis
+                sum_axis = len(input.shape) + sum_axis
 
-        shape_squeezed = [s for i,s in enumerate(self.shape) if i != sum_axis]
-        sum_res = ops.Sum.apply(self, sum_axis=sum_axis)
+            shape_squeezed = [s for i,s in enumerate(input.shape) if i != sum_axis]
+            sum_res = ops.Sum.apply(input, sum_axis=sum_axis)
+            
+            return sum_res if keepdims or sum_axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
         
-        return sum_res if keepdims or sum_axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
+        if sum_axis is not None:
+            return _sum(x, sum_axis, keepdims)
+        else:
+            for axis_idx in range(len(self.shape)):
+                x = _sum(x, axis_idx, keepdims = True)
+            
+            return ops.Reshape.apply(x, new_shape=(1, ))
 
     #* Binary operations
 
@@ -270,6 +282,9 @@ class Tensor:
 
     def exp(self) -> Tensor:
         return math.e ** self
+    
+    def sqrt(self) -> Tensor:
+        return self ** 0.5
 
     def matmul(self, other: Tensor) -> Tensor:
         x, y = self, other
@@ -294,7 +309,6 @@ class Tensor:
         y = y.reshape(*y.shape[0:-2], *[1]*min(n1-1, n2-1, 1), *y.shape[-2:]).transpose()
 
         return (x*y).sum(-1)
-
 
     #* Activation functions
     # TODO: Implement tanh, softmax
@@ -340,11 +354,11 @@ class Tensor:
             
             for parent, grad in zip(node._ctx.parents, grads):
                 if grad is not None and parent.requires_grad:
-                    assert grad.shape == parent.shape, f"Grad shape must match Matrix shape, {grad.shape} != {parent.shape}"
+                    assert grad.shape == parent.shape, f"Grad shape must match Tensor shape, {grad.shape} != {parent.shape}"
                     parent.grad = grad if parent.grad is None else (parent.grad + grad)
             
             # TODO: Bring back if needed (needs __deletable__ = '_ctx'?)
-            # del node._ctx
+            del node._ctx
 
     #* Broadcasting
 
@@ -413,36 +427,36 @@ class Tensor:
 
     def __mul__(self, other):
         if not isinstance(other, Tensor):
-            other = Tensor(other, False)
+            other = Tensor(other)
 
         return self.mul(other)
     
     def __rmul__(self, other):
-        other = Tensor(other, False)
+        other = Tensor(other)
 
         return self.mul(other, True)
 
     def __truediv__(self, other):
         if not isinstance(other, Tensor):
-            other = Tensor(other, False)
+            other = Tensor(other)
 
         return self.div(other)
     
     def __rtruediv__(self, other):
         if not isinstance(other, Tensor):
-            other = Tensor(other, False)
+            other = Tensor(other)
 
         return self.div(other, True)
     
     def __pow__(self, other):
         if not isinstance(other, Tensor):
-            other = Tensor(other, False)
+            other = Tensor(other)
 
         return self.pow(other)
 
     def __rpow__(self, other):
         if not isinstance(other, Tensor):
-            other = Tensor(other, False)
+            other = Tensor(other)
 
         return self.pow(other, True)
 

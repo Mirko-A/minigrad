@@ -139,32 +139,28 @@ class MiniBuffer:
 
     #* Reduce operations
 
-    def sum(self, sum_axis: Optional[int] = None) -> MiniBuffer:
+    def sum(self, sum_axis: int) -> MiniBuffer:
         x = self
 
-        if sum_axis is None:
-            sum_res = sum(self.data)
-            return MiniBuffer([sum_res], (1,))
-        else:
-            # Same as input but with a 1 at the sum axis index
-            out_shape = [1 if dim_idx == sum_axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
-            dim_order = [i for i in range(len(self.shape))]
+        # Same as input but with a 1 at the sum axis index
+        out_shape = [1 if dim_idx == sum_axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
+        dim_order = [i for i in range(len(self.shape))]
 
-            # Permute so sum axis is last
-            dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
-            out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
-            x = x.permute(dim_order)
-            
-            x = MiniBuffer(MiniBuffer._traverse_dims_and_sum_along_last(0,
-                                                                        0,
-                                                                        x), tuple(out_shape))
-            
-            # Permute back to original
-            out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
-            result = x.permute(dim_order)
+        # Permute so sum axis is last
+        dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
+        out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
+        x = x.permute(dim_order)
+        
+        x = MiniBuffer(MiniBuffer._traverse_dims_and_sum_along_last(0,
+                                                                    0,
+                                                                    x), tuple(out_shape))
+        
+        # Permute back to original
+        out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
+        result = x.permute(dim_order)
 
-            # Hack to make a contiguous MiniBuffer again
-            return (result + MiniBuffer.full_like(result, 0))
+        # Hack to make a contiguous MiniBuffer again
+        return (result + MiniBuffer.full_like(result, 0))
         
     #* Binary operations
 
@@ -350,7 +346,22 @@ class MiniBuffer:
         assert isinstance(other, MiniBuffer), f"Cannot perform exponentiation with MiniBuffer and {type(other)}."
 
         return self.pow(other)
+
+    def __lt__(self, other):
+        assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
+        if isinstance(other, int):
+            other = float(other)
+
+        return self.is_elementwise_less_than(other)
     
+    def __gt__(self, other):
+        assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
+        if isinstance(other, int):
+            other = float(other)
+
+        return self.is_elementwise_greater_than(other)
+
+
     #* Utility
 
     def is_scalar(self) -> bool:

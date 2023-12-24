@@ -37,13 +37,14 @@ class Log2(Function):
 #* Reduce operations
 
 class Sum(Function):
-    def forward(self, x: MiniBuffer, sum_axis: Optional[int] = None):
-        self.input_shape = x.shape
+    def forward(self, x: MiniBuffer, sum_axis: int):
+        self.sum_axis = sum_axis
+        self.sum_axis_size = x.shape[sum_axis]
 
         return x.sum(sum_axis)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.expand(self.input_shape)
+        return chain_grad.expand(self.sum_axis, self.sum_axis_size)
 
 #* Binary operations
 
@@ -105,10 +106,11 @@ class Pow(Function):
     def backward(self, chain_grad: MiniBuffer) -> tuple[Optional[MiniBuffer], Optional[MiniBuffer]]:
         if self.was_exp:
             return chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.full_like(self.exp, 1.0)))) if self.inputs_need_grad[0] else None, \
-                    chain_grad * ((self.base ** self.exp) * self.base.log(math.e)) if self.inputs_need_grad[1] else None
+                    chain_grad * ((self.base ** self.exp) * self.base.log()) if self.inputs_need_grad[1] else None
         else:
-            return chain_grad * ((self.base ** self.exp) * self.base.log(math.e)) if self.inputs_need_grad[0] else None, \
-                    chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.full_like(self.exp, 1.0)))) if self.inputs_need_grad[1] else None
+            return chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.full_like(self.exp, 1.0)))) if self.inputs_need_grad[0] else None, \
+                    chain_grad * ((self.base ** self.exp) * self.base.log()) if self.inputs_need_grad[1] else None
+                    
 
 #* Movement operations
 
