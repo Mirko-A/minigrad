@@ -1,4 +1,6 @@
-from minitorch.nn.linear import Linear
+from minitorch.nn.module import Linear
+from minitorch.nn.module import Sequence
+from minitorch.nn.optim import Adam
 from minitorch.nn.optim import SGD
 from minitorch.tensor import Tensor
 
@@ -6,29 +8,45 @@ import torch
 
 import numpy as np
 
-def argsort(x): return type(x)(sorted(range(len(x)), key=x.__getitem__))
+def main1():
+    t = Tensor.arange(1, 10)
+    print(t.sqrt())
 
 def main():
-    #print(b)
-    #print(a @ b)
-    # a = a.sum(1)
-    # print(a.shape)
+    m0 = Linear(2, 4)
+    m1 = Linear(4, 2)
+    m2 = Linear(2, 2)
 
-    # Given matrices A and B
-    test = Tensor.fill((3, 3), 1.0)
-    test = test + 2
-    print(test)
-    #A = Tensor.arange(0, 2*3*3*3).reshape((2, 3, 3, 3))
-    #at = torch.arange(0, 2*3*3*3).reshape((2, 3, 3, 3))
-    #B = Tensor.arange(0, 27).reshape((3, 3, 3))
-    #bt = torch.arange(0, 27).reshape((3, 3, 3))
+    params = []
+    params += m0.params()
+    params += m1.params()
+    params += m2.params()
 
-    #res = A.sum(1)
-    #rest = at.sum(1)
-    #print(res)
-    #print(res.shape)
-    #print(rest)
-    #print(rest.shape)
+    adam = Adam(params, 0.05)
+
+    input = Tensor([[0, 0],
+                    [1, 0],
+                    [0, 1],
+                    [1, 1]])
+    target = Tensor([[0], 
+                           [1], 
+                           [1],
+                           [1]])
+
+    for epoch in range(50):
+        adam.zero_grad()
+
+        x0 = m0(input)
+        x1 = m1(x0)
+        x2 = m2(x1)
+        pred = x2.sigmoid()
+
+        l = ((target - pred) ** 2).sum()
+        l.backward()
+        print(f"Loss: {l}")
+        #print(pred)
+
+        adam.step()
 
 if __name__ == "__main__":
     main()
