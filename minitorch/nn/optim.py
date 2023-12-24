@@ -1,43 +1,77 @@
 from abc import ABC, abstractmethod
-from minitorch.tensor import Tensor
 import math
 
+from minitorch.tensor import Tensor
+from minitorch import helpers
+
 class Optimizer:
-    def __init__(self, parameters: Tensor, learning_rate: float) -> None:
-        self.parameters = parameters.flatten().item()
-        self.learning_rate = learning_rate
+    def __init__(self, params: list[Tensor], learning_rate: float) -> None:
+        for p in params:
+            if not p.requires_grad:
+                p.requires_grad = True
+
+        self.params = params
+        self.lr = Tensor([learning_rate])
 
     @abstractmethod
     def step(self) -> None:
         ...
 
     def zero_grad(self) -> None:
-        for p in self.parameters:
-            p.grad = 0.0
+        for p in self.params:
+            p.grad = None
 
 class SGD(Optimizer):
-    def __init__(self, parameters: Tensor, learning_rate: float) -> None:
-        super().__init__(parameters, learning_rate)
+    def __init__(self, params: list[Tensor], 
+                 learning_rate: float = 1e-3,
+                 momentum: float = 0.0, 
+                 weight_decay: float = 0.0,
+                 nesterov: bool = False) -> None:
+        super().__init__(params, learning_rate)
+        self.momentum = momentum
+        self.wd = weight_decay
+        self.nesterov = nesterov
+        self.b = [Tensor.zeros(t.shape) for t in self.params] if not helpers.float_equal(self.momentum, 0.0) else None
 
     def step(self) -> None:
-        for p in self.parameters:
-            p.data -= p.grad * self.learning_rate
+        for i, t in enumerate(self.params):
+            assert t.grad is not None
+            g = t.grad + self.wd * t.detach()
+
+            if not helpers.float_equal(self.momentum, 0.0):
+                self.b[i].assign(self.momentum * self.b[i] + g)
+
+                if self.nesterov:
+                    g = (g + self.momentum * self.b[i])
+                else:
+                    g = self.b[i]
+
+            t.assign(t.detach() - t.grad * self.lr)
                 
 class Adam(Optimizer):
-    def __init__(self, parameters: Tensor, learning_rate: float, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-08) -> None:
-        super().__init__(parameters, learning_rate)
-        self.betas = betas
+    def __init__(self, params: Tensor, 
+                 learning_rate: float = 1e-3,
+                 weight_decay: float = 0.0,
+                 betas: tuple[float, float] = (0.9, 0.999), 
+                 eps: float = 1e-08) -> None:
+        super().__init__(params, learning_rate)
+        self.wd = weight_decay
+        self.b1, self.b2 = betas[0], betas[1]
         self.eps = eps
-        self.prev_moments = [[0, 0] for _ in range(parameters.shape.col)]
+        self.m = [Tensor.zeros(t.shape) for t in self.params]
+        self.v = [Tensor.zeros(t.shape) for t in self.params]
         
     def step(self) -> None:
-        for i, p in enumerate(self.parameters):
-            beta1, beta2 = self.betas[0], self.betas[1]
-            mt_prev, vt_prev = self.prev_moments[i][0], self.prev_moments[i][1]
-            
-            mt = beta1 * mt_prev + (1 - beta1) * p.grad
-            vt = beta2 * vt_prev + (1 - beta2) * p.grad ** 2
-            p.data -= (self.learning_rate / (math.sqrt(vt) + self.eps)) * mt
-            
-            self.prev_moments[i][0] = mt
-            self.prev_moments[i][1] = vt
+        for i, t in enumerate(self.params):
+            assert t.grad is not None
+            g = t.grad + self.wd * t.detach()
+
+            self.m[i].assign(self.b1 * self.m[i] + (1.0 - self.b1) * g)
+            self.v[i].assign(self.b2 * self.v[i] + (1.0 - self.b2) * (g * g))
+
+            m_hat = self.m[i] / (1.0 - self.b1**(i + 1))
+            v_hat = self.v[i] / (1.0 - self.b2**(i + 1))
+
+            up = (m_hat / (v_hat.sqrt() + self.eps))
+
+            t.assign(t.detach() - self.lr * up)

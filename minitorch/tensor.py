@@ -493,6 +493,33 @@ class Tensor:
     def __hash__(self):
         return id(self)
 
+    #* Data handlers
+
+    #? NOTE: Mirko, 24. 12. 2023
+    # This function shall be used whenever a Tensor needs to be
+    # modified inplace. It is essentially a shallow copy.
+    # Other use case for this function is when traversing a 
+    # collection of tensors (i.e. list of Tensors that repre-
+    # sent parameters of an NN module) and needing to update
+    # the Tensors from there.
+    def assign(self, x) -> Tensor:
+        if not isinstance(x, Tensor): 
+            x = Tensor(x)
+        assert self.shape == x.shape, f"Assign shape mismatch {self.shape} != {x.shape}."
+        assert not x.requires_grad
+
+        self.data = x.data
+        
+        return self
+
+    #? NOTE: Mirko, 24. 12. 2023
+    # This function shall be used to detach the Tensor from
+    # the autograd graph. It is mostly used in the NN modules
+    # to use data from the Tensors without adding those operations
+    # to the graph.
+    def detach(self) -> Tensor: 
+        return Tensor(self.data)
+
     #* Utility
 
     @staticmethod
