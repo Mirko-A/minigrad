@@ -1,6 +1,5 @@
 import math
 
-from minitorch.value import Value
 from minitorch.tensor import Tensor
 from minitorch.nn.module import Module
 

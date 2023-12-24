@@ -56,7 +56,7 @@ class Tensor:
     def T(self) -> Tensor:
         return self.transpose()
 
-    # Static Matrix generation methods
+    #* Static Matrix generation methods
     # TODO: Implement: one_hot
 
     @staticmethod
@@ -95,59 +95,30 @@ class Tensor:
 
     @staticmethod
     def replace(input: Tensor, target: float, new: float) -> Tensor:
-        return Tensor(MiniBuffer.replace(input, target, new), input.requires_grad)
-    
-    # TODO: Not implemented!!
+        return Tensor(MiniBuffer.replace(input.data, target, new), input.requires_grad)
+
     @staticmethod
-    def tril(input: Tensor) -> Tensor:
-        assert input.is_square(), "Cannot apply tril to non-square matrices."
-      
-        def tril_main_diagonal(input: Tensor) -> Tensor:
-            out_data = []
-            tril_cursor = 1
+    def tril(input: Tensor, diagonal: int = 0) -> Tensor:
+        assert input.is_square(), "Cannot apply tril to non-square Tensors."
+        assert diagonal >= -3 and diagonal < 3, \
+            f"Cannot apply tril, invalid value provided for diagonal parameter: {diagonal}. Expected range [-3, 2]."
+        
+        return Tensor(MiniBuffer.tril(input.data, diagonal), input.requires_grad)
 
-            for row in input.data:
-                out_row = []
-
-                for value_pos, value in enumerate(row):
-                    should_keep_value = value_pos < tril_cursor
-                    out_row.append(value if should_keep_value else 0.0)
-
-                out_data.append(out_row)
-                tril_cursor += 1
-            
-            return Tensor(out_data, input.requires_grad)
-      
-        def tril_anti_diagonal(input: Tensor) -> Tensor:
-            out_data = []
-            tril_cursor = 0
-
-            for row in input.data:
-                out_row = []
-
-                for value_pos, value in enumerate(row):
-                    should_replace_value = value_pos < tril_cursor
-                    out_row.append(0.0 if should_replace_value else value)
-
-                out_data.append(out_row)
-                tril_cursor += 1
-          
-            return Tensor(out_data, input.requires_grad)
-
-        output = tril_main_diagonal(input) if diagonal == Tensor.Diagonal.MAIN else tril_anti_diagonal(input)
-
-        return output
-
-    # Movement methods
+    #* Movement methods
     
-    # NOTE: The way this version of reshape (with *args) works
+    #? NOTE: Mirko, 24. 12. 2023  
+    # How exactly this version of reshape (with *args) works
     # isn't super clear, it was simply stolen from tinygrad. 
     # The original had just the new shape and it applied the
     # Reshape operation on it. The current version was taken
     # from tinygrad because it is needed for matmul.
     def reshape(self, new_shape: tuple[int, ...], *args) -> Tensor:
+        assert math.prod(new_shape) == math.prod(self.shape), \
+            f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(new_shape)} != {math.prod(self.shape)})."
         new_shape = helpers.argfix(new_shape, *args)
-        assert 0 not in new_shape, f"zeros not allowed in shape {new_shape}"
+        assert 0 not in new_shape, \
+            f"Zeros not allowed in shape ({new_shape})."
         
         return ops.Reshape.apply(self, new_shape=tuple([-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape]))
     
@@ -158,7 +129,7 @@ class Tensor:
 
     def permute(self, order: tuple[int, ...]) -> Tensor:
         assert len(order) >= len(self.shape), \
-                f"Cannot permute Tensor. new shape dimensionality {len(order)} is smaller than original one {len(self.shape)}"
+                f"Cannot permute Tensor. New shape dimensionality {len(order)} is smaller than original one {len(self.shape)}"
         x = self
         shape_diff = len(order) - len(x.shape)
         
@@ -178,13 +149,13 @@ class Tensor:
         order[axis0], order[axis1] = order[axis1], order[axis0]
         return ops.Permute.apply(x, order=order)
 
-    # Reshape methods
+    #* Reshape methods
 
-    # NOTE: these are different from the reshape() fn. These operations
-    # add/remove elements of the tensor whereas the reshape() fn just
+    #? NOTE: Mirko, 24. 12. 2023 
+    # These are different from the Reshape movement operation. These operations
+    # add/remove elements of the tensor whereas the Reshape operation just
     # changes the shape without modifying the elements.
     
-    # TODO: There is a bug in pad (try padding 3x3 -> 5x5)
     def pad(self, new_shape: tuple[int, ...]) -> Tensor:
         assert len(new_shape) >= len(self.shape), \
             f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
@@ -229,7 +200,7 @@ class Tensor:
         
         return x
     
-    # Unary operations
+    #* Unary operations
 
     def neg(self) -> Tensor:
         return ops.Neg.apply(self)
@@ -255,7 +226,7 @@ class Tensor:
         
         return sum_res if keepdims or sum_axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
 
-    # Binary operations
+    #* Binary operations
 
     def add(self, other: Tensor, reverse: bool = False) -> Tensor:
         x, y = self, other
@@ -300,7 +271,6 @@ class Tensor:
     def exp(self) -> Tensor:
         return math.e ** self
 
-    # TODO: Not implemented!!
     def matmul(self, other: Tensor) -> Tensor:
         x, y = self, other
         n1, n2 = len(x.shape), len(y.shape)
@@ -310,7 +280,8 @@ class Tensor:
         assert x.shape[-1] == y.shape[-2], \
             f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-2]})"
         
-        # NOTE: This last part isn't super clear, it was simply
+        #? NOTE: Mirko, 24. 12. 2023 
+        # This last part isn't super clear, it was simply
         # stolen from tinygrad. But my guess is that it is an
         # n-dimensional analogy to the way you can perfom matrix
         # multiplication between A[m, n] and B[n, p] by performing
@@ -325,7 +296,7 @@ class Tensor:
         return (x*y).sum(-1)
 
 
-    # Activation functions
+    #* Activation functions
     # TODO: Implement tanh, softmax
     
     def sigmoid(self) -> Tensor:
@@ -334,10 +305,10 @@ class Tensor:
     def relu(self) -> Tensor:
         return ops.Relu.apply(self)
     
-    # Cost functions
+    #* Cost functions
     # TODO: Implement MSE, cross_entropy
 
-    # Backpropagation
+    #* Backpropagation
 
     def toposort(self):
         def _toposort(node: Tensor, visited: set[Tensor], nodes: list[Tensor]):
@@ -375,7 +346,7 @@ class Tensor:
             # TODO: Bring back if needed (needs __deletable__ = '_ctx'?)
             # del node._ctx
 
-    # Broadcasting
+    #* Broadcasting
 
     def _broadcasted(self, y: Tensor) -> tuple[Tensor, Tensor]:
         x: Tensor = self
@@ -404,16 +375,17 @@ class Tensor:
 
         return (x, y)
 
-    # Unary operator magic methods
+    #* Unary operator magic methods
 
     def __neg__(self) -> Tensor:
         return self.neg()
 
-    # TODO: Not implemented!! Could use at(x, y, z)
-    def __getitem__(self, key) -> list[float]:
-        return self.data[key]
+    def __getitem__(self, keys: tuple[int, ...]) -> float:
+        assert len(keys) == len(self.shape), \
+            f"Cannot retreive an element from Tensor with given key: {keys}. Key must match Tensor's shape ({self.shape})."
+        return self.data[keys]
     
-    # Binary operator magic methods
+    #* Binary operator magic methods
 
     def __add__(self, other):
         if not isinstance(other, Tensor):
@@ -507,7 +479,7 @@ class Tensor:
     def __hash__(self):
         return id(self)
 
-    # Utility
+    #* Utility
 
     @staticmethod
     def pad_shapes(shape_diff: int, x: Tensor) -> Tensor:

@@ -4,8 +4,15 @@ from enum import Enum, auto
 import numpy as np
 import math
 
+#! WARN: Mirko, 24. 12. 2023
+# In order for everything to work as expected, MiniBuffer data
+# must remain contiguous at all times. That means that operations
+# which involve permuting the MiniBuffer must be, at the end, fo-
+# llowed by a neutral operation (addition with 0, multiplication
+# with 1) in order to create a new, contiguous MiniBuffer from the
+# current one's data.
+
 class MiniBuffer:
-    # TODO: Add more...
     class UnaryOp(Enum):
         NEG  = 0
         LOG  = auto()
@@ -45,7 +52,7 @@ class MiniBuffer:
         else:
             self.strides = strides
 
-    # Static MiniBuffer generation operations
+    #* Static MiniBuffer generation operations
 
     @staticmethod
     def np_load(data: list) -> MiniBuffer:
@@ -87,13 +94,24 @@ class MiniBuffer:
 
     @staticmethod
     def masked_fill(input: MiniBuffer, mask: list[bool], value: float) -> MiniBuffer:
-        return MiniBuffer._traverse_dims_and_masked_fill(0,
-                                                         0,
-                                                         mask,
-                                                         value,
-                                                         input)
-    
-    # Unary operations
+        out_data = MiniBuffer._traverse_dims_and_masked_fill(0,
+                                                             0,
+                                                             mask,
+                                                             value,
+                                                             input)
+        
+        return MiniBuffer(out_data, input.shape)
+
+    @staticmethod
+    def tril(input: MiniBuffer, diagonal: int) -> MiniBuffer:
+        out_data = MiniBuffer._traverse_dims_and_tril(0,
+                                                      0,
+                                                      diagonal,
+                                                      input)
+        
+        return MiniBuffer(out_data, input.shape)
+
+    #* Unary operations
 
     def neg(self) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
@@ -119,11 +137,8 @@ class MiniBuffer:
 
         return MiniBuffer(out_data, self.shape)
 
-    # Reduce operations
+    #* Reduce operations
 
-    # TODO: For some reason this doesn't work on 4D and higher
-    # tensors...Anyway we're not going to use those but it bugs
-    # me and I wanna know why it happens. 
     def sum(self, sum_axis: Optional[int] = None) -> MiniBuffer:
         x = self
 
@@ -151,7 +166,7 @@ class MiniBuffer:
             # Hack to make a contiguous MiniBuffer again
             return (result + MiniBuffer.full_like(result, 0))
         
-    # Binary operations
+    #* Binary operations
 
     def add(self, other: MiniBuffer) -> MiniBuffer:
         out_data = MiniBuffer._traverse_dims_and_apply_op(0,
@@ -200,8 +215,6 @@ class MiniBuffer:
                                                           self, other)
 
         return MiniBuffer(out_data, self.shape)
-    
-    # TODO: Equality functions are not working
 
     def is_equal_to(self, target: MiniBuffer) -> bool:
         return MiniBuffer._traverse_dims_and_compare(0,
@@ -230,16 +243,15 @@ class MiniBuffer:
                                                                  self,
                                                                  target)
 
-    # Movemenet operations
+    #* Movemenet operations
 
     def reshape(self, new_shape: tuple[int, ...]) -> MiniBuffer:
         return MiniBuffer(self.data, new_shape)
     
-    # TODO: This was hardcoded for 3D
     def flatten(self) -> MiniBuffer:
         total_elements = math.prod(self.shape)
 
-        return MiniBuffer(self.data, (1, 1, total_elements))
+        return MiniBuffer(self.data, (total_elements, ))
 
     def permute(self, order: tuple[int, ...]) -> MiniBuffer:
         new_dims = ()
@@ -254,9 +266,10 @@ class MiniBuffer:
         # Hack to make a contiguous MiniBuffer again
         return (result + MiniBuffer.full_like(result, 0))
 
-    # Reshape methods
+    #* Reshape methods
     
-    # NOTE: these are different from the reshape() fn. These operations
+    #? NOTE: Mirko, 24. 12. 2023 
+    # These are different from the reshape() fn. These operations
     # add/remove elements of the tensor whereas the reshape() fn just
     # changes the shape without modifying the elements.
     
@@ -278,16 +291,15 @@ class MiniBuffer:
 
         return MiniBuffer(out_data, new_shape)
 
-    # TODO: Kinda works. Need to figure out new strides as
-    # they are currently not affected by this fn.
     def expand(self, expansion_axis: int, expanded_size: int) -> MiniBuffer:
         out_data = self.data * expanded_size
 
         out_shape = [dim for dim in self.shape]
         out_shape[expansion_axis] = expanded_size
 
-        # NOTE: Since we're just multiplying the data array
-        # by expanded_size, somehow we need to preserve the
+        #? NOTE: Mirko, 24. 12. 2023 
+        # Since we're just multiplying the data array by
+        # expanded_size, somehow we need to preserve the
         # meaning of the original shape and strides. Other-
         # wise, expanding a 1x3 and a 3x1 tensor would res-
         # ult in the same output, which is wrong.
@@ -307,12 +319,12 @@ class MiniBuffer:
         # Hack to make a contiguous MiniBuffer again
         return (result + MiniBuffer.full_like(result, 0))
 
-    # Unary operator magic methods
+    #* Unary operator magic methods
 
     def __neg__(self):
         return self.neg()
 
-    # Binary operator magic methods
+    #* Binary operator magic methods
 
     def __add__(self, other):
         assert isinstance(other, MiniBuffer), f"Cannot perform addition with MiniBuffer and {type(other)}."
@@ -339,16 +351,22 @@ class MiniBuffer:
 
         return self.pow(other)
     
-    # Utility
+    #* Utility
 
     def is_scalar(self) -> bool:
         return len(self.shape) == 1
 
     def is_square(self) -> bool:
+        assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
         return self.shape[-2] == self.shape[-1]
 
-    def __getitem__(self, key) -> list[float]:
-        return self.data[key]
+    def __getitem__(self, keys: tuple[int, ...]) -> list[float]:
+        item_pos = 0
+
+        for dim_idx, key in enumerate(keys):
+            item_pos += self.strides[dim_idx] * key
+            
+        return self.data[item_pos]
 
     def __len__(self) -> int:
         return len(self.data)
@@ -364,7 +382,9 @@ class MiniBuffer:
 
         return repr
 
-    # Helper static methods
+    #* Helper methods
+
+    #* Helper static methods
     
     @staticmethod
     def get_strides_from_shape(shape: tuple[int, ...]) -> tuple[int, ...]:
@@ -382,7 +402,8 @@ class MiniBuffer:
 
         return strides
 
-    # This function iterates over the elements of all provided dimensions 
+    #? NOTE: Mirko, 24. 12. 2023
+    #  This function iterates over the elements of all provided dimensions 
     # (taken from 'current_shape' which starts as the shape of the operand)
     # and performs the following:
     # Check if we've reached  the last dimension -> that's where the values
@@ -416,14 +437,14 @@ class MiniBuffer:
         else:
             for dim_idx in range(operands[0].shape[depth_idx]):
                 x_pos = current_positions[0] + dim_idx * operands[0].strides[depth_idx]
-                current_pos = (x_pos, )
+                next_pos = (x_pos, )
 
                 if isinstance(op, MiniBuffer.BinaryOp):
                     y_pos = current_positions[1] + dim_idx * operands[1].strides[depth_idx]
-                    current_pos += (y_pos, )
+                    next_pos += (y_pos, )
 
                 out_data += MiniBuffer._traverse_dims_and_apply_op(depth_idx + 1,
-                                                                   current_pos,
+                                                                   next_pos,
                                                                    op,
                                                                    *operands)
         
@@ -445,17 +466,14 @@ class MiniBuffer:
             out_data.append(sum)
         else:
             for dim_idx in range(x.shape[depth_idx]):
-                x_pos = current_position +  dim_idx * x.strides[depth_idx]
+                next_pos = current_position +  dim_idx * x.strides[depth_idx]
 
                 out_data += MiniBuffer._traverse_dims_and_sum_along_last(depth_idx + 1,
-                                                                         x_pos,
+                                                                         next_pos,
                                                                          x)
 
         return out_data
 
-    # Reshape ops are different from the reshape() fn. These operations
-    # add/remove elements of the tensor whereas the reshape() fn just
-    # changes the shape without modifying the elements.
     @staticmethod
     def _traverse_dims_and_apply_reshape_op(depth_idx: int,
                                             current_position: int,
@@ -481,9 +499,9 @@ class MiniBuffer:
             out_data += current_dim
         else:
             for dim_idx in range(new_shape[depth_idx]):
-                x_pos = current_position + dim_idx * x.strides[depth_idx]
+                next_pos = current_position + dim_idx * x.strides[depth_idx]
                 out_data += MiniBuffer._traverse_dims_and_apply_reshape_op(depth_idx + 1,
-                                                                           x_pos,
+                                                                           next_pos,
                                                                            op,
                                                                            new_shape,
                                                                            x)
@@ -504,9 +522,10 @@ class MiniBuffer:
             for dim_idx in range(x.shape[depth_idx]):
                 x_pos = current_position + dim_idx * x.strides[depth_idx]
                 target_pos = dim_idx * target.strides[depth_idx]
+                next_pos = (x_pos, target_pos)
 
                 return MiniBuffer._traverse_dims_and_compare(depth_idx + 1,
-                                                             (x_pos, target_pos),
+                                                             next_pos,
                                                              x,
                                                              target)
 
@@ -532,15 +551,14 @@ class MiniBuffer:
                     assert False, f"Invalid operation: {op}."
         else:
             for dim_idx in range(x.shape[depth_idx]):
-                x_pos = current_position + dim_idx * x.strides[depth_idx]
+                next_pos = current_position + dim_idx * x.strides[depth_idx]
                 out_data += MiniBuffer._traverse_dims_and_compare_elementwise(depth_idx + 1,
-                                                                              x_pos,
+                                                                              next_pos,
                                                                               op,
                                                                               x,
                                                                               target)
         
         return out_data
-
 
     @staticmethod
     def _traverse_dims_and_masked_fill(depth_idx: int,
@@ -561,12 +579,34 @@ class MiniBuffer:
                     out_data.append(x.data[val_pos])
         else:
             for dim_idx in range(x.shape[depth_idx]):
-                x_pos = current_position + dim_idx * x.strides[depth_idx]
+                next_pos = current_position + dim_idx * x.strides[depth_idx]
                 out_data += MiniBuffer._traverse_dims_and_masked_fill(depth_idx + 1,
-                                                                      x_pos,
+                                                                      next_pos,
                                                                       mask,
                                                                       value,
                                                                       x)
+        
+        return out_data
+
+    @staticmethod
+    def _traverse_dims_and_tril(depth_idx: int,
+                                current_position: int,
+                                diagonal: str,
+                                x: MiniBuffer) -> list[float]:
+        out_data = []
+
+        if depth_idx == len(x.shape) - 2:
+                out_data += MiniBuffer._tril(depth_idx,
+                                             current_position,
+                                             diagonal,
+                                             x)
+        else:
+            for dim_idx in range(x.shape[depth_idx]):
+                next_pos = current_position + dim_idx * x.strides[depth_idx]
+                out_data += MiniBuffer._traverse_dims_and_tril(depth_idx + 1,
+                                                               next_pos,
+                                                               diagonal,
+                                                               x)
         
         return out_data
 
@@ -606,10 +646,10 @@ class MiniBuffer:
         current_dim = []
 
         for val_idx in range(new_shape[depth_idx]):
-            target_position = current_position + val_idx * x.strides[depth_idx]
+            val_pos = current_position + val_idx * x.strides[depth_idx]
                 
-            if val_idx < x.shape[depth_idx] and target_position < len(x.data):
-                current_dim.append(x.data[target_position])
+            if val_idx < x.shape[depth_idx] and val_pos < len(x.data):
+                current_dim.append(x.data[val_pos])
             else:
                 current_dim.append(0.0)
 
@@ -623,10 +663,10 @@ class MiniBuffer:
         current_dim = []
 
         for val_idx in range(new_shape[depth_idx]):
-            target_position = current_position + val_idx * x.strides[depth_idx]
+            val_pos = current_position + val_idx * x.strides[depth_idx]
 
             if len(current_dim) < new_shape[depth_idx]:
-                current_dim.append(x.data[target_position])
+                current_dim.append(x.data[val_pos])
 
         return current_dim
 
@@ -636,13 +676,38 @@ class MiniBuffer:
                  x: MiniBuffer,
                  target: MiniBuffer) -> bool:
         for val_idx in range(x.shape[depth_idx]):
-            x_pos = current_positions[0] + val_idx * x.strides[depth_idx]
+            val_pos = current_positions[0] + val_idx * x.strides[depth_idx]
             target_pos = current_positions[1] + val_idx * target.strides[depth_idx]
 
-            if x.data[x_pos] != target.data[target_pos]:
+            if x.data[val_pos] != target.data[target_pos]:
                 return False
 
         return True
+
+    #? NOTE: Mirko, 24. 12. 2023 
+    # This only works with contiguous MiniBuffers, so
+    # you better make sure to keep them contiguous at
+    # all times.
+    def _tril(depth_idx: int,
+              current_position: int,
+              diagonal: int,
+              x: MiniBuffer) -> list[float]:
+        out_data = []
+        tril_cursor = 1 + diagonal
+
+        for row_idx in range(x.shape[depth_idx]):
+            out_row = []
+            row_pos = current_position + row_idx * x.strides[depth_idx]
+
+            for val_idx in range(x.shape[depth_idx + 1]):
+                val_pos = row_pos + val_idx * x.strides[depth_idx + 1]
+                should_keep_value = val_idx < tril_cursor
+                out_row.append(x.data[val_pos] if should_keep_value else 0.0)
+            
+            out_data += out_row
+            tril_cursor += 1
+            
+        return out_data
 
     @staticmethod
     def _traverse_dims_and_repr(depth_idx: int,

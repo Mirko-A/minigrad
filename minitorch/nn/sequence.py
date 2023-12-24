@@ -1,6 +1,6 @@
+from minitorch.tensor import Tensor
 from minitorch.nn.module import Module
 from minitorch.ops import Function
-from minitorch.matrix import Tensor
 
 class Sequence(Module):
     def __init__(self, *components: Module | Function) -> None:

@@ -6,7 +6,7 @@ from minitorch.tensor import Function
 from minitorch.buffer import MiniBuffer
 from minitorch import helpers
 
-# Unary operations
+#* Unary operations
 
 class Neg(Function):
     def forward(self, x: MiniBuffer) -> MiniBuffer: 
@@ -34,7 +34,7 @@ class Log2(Function):
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad / (self.x * MiniBuffer.full_like(self.x, self.base).log())
 
-# Reduce operations
+#* Reduce operations
 
 class Sum(Function):
     def forward(self, x: MiniBuffer, sum_axis: Optional[int] = None):
@@ -45,7 +45,7 @@ class Sum(Function):
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.expand(self.input_shape)
 
-# Binary operations
+#* Binary operations
 
 class Add(Function):
     def forward(self, x: MiniBuffer, y: MiniBuffer) -> MiniBuffer:
@@ -110,7 +110,7 @@ class Pow(Function):
             return chain_grad * ((self.base ** self.exp) * self.base.log(math.e)) if self.inputs_need_grad[0] else None, \
                     chain_grad * (self.exp * (self.base ** (self.exp - MiniBuffer.full_like(self.exp, 1.0)))) if self.inputs_need_grad[1] else None
 
-# Movement operations
+#* Movement operations
 
 class Permute(Function):
     def forward(self, x: MiniBuffer, order: tuple[int, ...]) -> MiniBuffer:
@@ -130,9 +130,10 @@ class Reshape(Function):
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.reshape(self.input_shape)
 
-# Reshape operations
+#* Reshape operations
 
-# NOTE: these are different from the Reshape movement operation. These operations
+#? NOTE: Mirko, 24. 12. 2023 
+# These are different from the Reshape movement operation. These operations
 # add/remove elements of the tensor whereas the Reshape operation just
 # changes the shape without modifying the elements.
 
@@ -142,7 +143,8 @@ class Pad(Function):
 
         return x.pad(new_shape)
 
-    # TODO: It makes sense that shrink is opposite of pad but this
+    # TODO: Mirko, 24. 12. 2023 
+    # It makes sense that shrink is opposite of pad but this
     # has not been checked!
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.shrink(self.input_shape)
@@ -153,12 +155,12 @@ class Shrink(Function):
 
         return x.shrink(new_shape)
 
-    # TODO: It makes sense that pad is opposite of shrink but this
+    # TODO: Mirko, 24. 12. 2023  
+    # It makes sense that pad is opposite of shrink but this
     # has not been checked!
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.pad(self.input_shape)
 
-# NOTE: this is sum in reverse
 class Expand(Function):
     def forward(self, x: MiniBuffer, expansion_axis: int, expanded_size: int) -> MiniBuffer:
         self.reduce_dim = expansion_axis
@@ -168,7 +170,7 @@ class Expand(Function):
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.sum(self.reduce_dim)
 
-# Activation functions
+#* Activation functions
 
 class Sigmoid(Function):
     def forward(self, x: MiniBuffer) -> MiniBuffer:
