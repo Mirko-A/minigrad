@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import math
 
 from minitorch.tensor import Tensor
 from minitorch import helpers

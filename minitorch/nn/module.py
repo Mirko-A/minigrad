@@ -133,10 +133,6 @@ class Sequence(Module):
         params = []
         
         for module in self.modules:
-            # TODO: Mirko, 24. 12. 2023
-            # This is wrong now, used to be used for function objects
-            # (for example softmax) back when those were created using
-            # the Function class as a base.
             p = module.params()
             if p is not None:
                 params += p 
