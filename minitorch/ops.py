@@ -50,8 +50,6 @@ class Sum(Function):
 
 class Add(Function):
     def forward(self, x: MiniBuffer, y: MiniBuffer) -> MiniBuffer:
-        self.x, self.y = x, y
-        
         return x + y
     
     def backward(self, chain_grad: MiniBuffer) -> tuple[Optional[MiniBuffer], Optional[MiniBuffer]]:
@@ -60,8 +58,6 @@ class Add(Function):
     
 class Sub(Function):
     def forward(self, x: MiniBuffer, y: MiniBuffer) -> MiniBuffer:
-        self.x, self.y = x, y
-        
         return x - y
     
     def backward(self, chain_grad: MiniBuffer) -> tuple[Optional[MiniBuffer], Optional[MiniBuffer]]:
