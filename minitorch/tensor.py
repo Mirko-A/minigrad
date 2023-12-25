@@ -5,6 +5,7 @@ import math
 
 from minitorch.buffer import MiniBuffer
 from minitorch import helpers
+from minitorch.settings import DEBUG
 
 class Function:
     def __init__(self, *inputs: Tensor):
@@ -32,7 +33,8 @@ class Function:
 import minitorch.ops as ops
 
 class Tensor:
-    __deletable__ = ('_ctx',)
+    __slots__ = ("data", "requires_grad", "grad", "_ctx")
+    __deletable__ = ("_ctx",)
 
     def __init__(self, data: float | int | list | MiniBuffer, requires_grad: bool = False):
         if isinstance(data, MiniBuffer):
@@ -89,10 +91,12 @@ class Tensor:
 
     @staticmethod
     def masked_fill(input: Tensor, mask: list[bool], value: float) -> Tensor:
+        if DEBUG:
+            assert all(isinstance(mask_val, bool) for mask_val in mask), \
+                   f"Invalid mask type provided. Expected list[bool]"
         assert len(mask) == len(input.data), \
                f"Cannot mask {input.shape} Tensor with mask of length {len(mask)}"
-        assert all(isinstance(mask_val, bool) for mask_val in mask), \
-               f"Invalid mask type provided. Expected list[bool]"
+        
         return Tensor(MiniBuffer.masked_fill(input.data, mask, value), input.requires_grad)
 
     @staticmethod
@@ -132,6 +136,7 @@ class Tensor:
     def permute(self, order: tuple[int, ...]) -> Tensor:
         assert len(order) >= len(self.shape), \
                 f"Cannot permute Tensor. New shape dimensionality {len(order)} is smaller than original one {len(self.shape)}"
+        
         x = self
         shape_diff = len(order) - len(x.shape)
         
@@ -159,10 +164,12 @@ class Tensor:
     # changes the shape without modifying the elements.
     
     def pad(self, new_shape: tuple[int, ...]) -> Tensor:
+        if DEBUG:
+            assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+                    f"Cannot pad, new shape expected type is tuple[int, ...] but got type{new_shape}."
         assert len(new_shape) >= len(self.shape), \
             f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
-        assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
-                f"Cannot pad, new shape expected type is tuple[int, ...] but got type{new_shape}."
+            
         x = self
         shape_diff = len(new_shape) - len(x.shape)
         
@@ -172,10 +179,12 @@ class Tensor:
         return ops.Pad.apply(x, new_shape=new_shape)
 
     def shrink(self, new_shape: tuple[int, ...]) -> Tensor:
+        if DEBUG:
+            assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+                    f"Cannot shrink, new shape expected type is tuple[int, ...] but got type{new_shape}."
         assert len(new_shape) <= len(self.shape), \
             f"Cannot shrink, new shape dimensionality {new_shape} is greater than original one {self.shape}."
-        assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
-                f"Cannot shrink, new shape expected type is tuple[int, ...] but got type{new_shape}."
+        
         x = self
         shape_diff = len(new_shape) - len(x.shape)
         
@@ -185,10 +194,12 @@ class Tensor:
         return ops.Shrink.apply(x, new_shape=new_shape)
     
     def expand(self, new_shape: tuple[int, ...]) -> Tensor:
+        if DEBUG:
+            assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+                    f"Cannot expand, new shape expected type is tuple[int, ...] but got type{new_shape}."
         assert len(new_shape) >= len(self.shape), \
             f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
-        assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
-                f"Cannot expand, new shape expected type is tuple[int, ...] but got type{new_shape}."
+            
         x = self
         shape_diff = len(new_shape) - len(x.shape)
         
@@ -203,8 +214,9 @@ class Tensor:
         return x
     
     def cat(self, axis: int, *others: Tensor) -> Tensor:
-        assert all(isinstance(other, Tensor) for other in others), \
-            f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(others)}."
+        if DEBUG:
+            assert all(isinstance(other, Tensor) for other in others), \
+                f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(others)}."
         assert all(other.shape[axis] == self.shape[axis] for other in others), \
             f"Cannot concatenate, all Tensors must have the same size ({self.shape[axis]}) along the concatenation axis."
 
@@ -232,7 +244,8 @@ class Tensor:
         x = self
 
         def _sum(input: Tensor, axis: int, keepdims: bool) -> Tensor:
-            assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
+            if DEBUG:
+                assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
             assert abs(axis) < len(input.shape), f"Cannot calculate sum, invalid axis provided. Tensor shape is {input.shape} but {axis}th dimension was provided."
         
             # Negative axes allowed
@@ -313,7 +326,7 @@ class Tensor:
         n1, n2 = len(x.shape), len(y.shape)
         
         assert n1 > 1 and n2 > 1, \
-            f"both arguments to matmul need to be at least 2D, but they are {n1}D and {n2}D"
+            f"both arguments to matmul need to be at least 2D, but they are {n1}D and {n2}D."
         assert x.shape[-1] == y.shape[-2], \
             f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-2]})"
         
@@ -351,15 +364,17 @@ class Tensor:
     #* Cost functions
 
     def MSE(self, target: Tensor, axis: Optional[int] = None) -> Tensor:
-        assert isinstance(target, Tensor), \
-            f"Cannot calculate MSE loss, invalid target type. Expected Tensor, got {type(target)}."
+        if DEBUG:
+            assert isinstance(target, Tensor), \
+                f"Cannot calculate MSE loss, invalid target type. Expected Tensor, got {type(target)}."
 
         square_error = (self - target) ** 2
         return square_error.mean(axis)
 
     def cross_entropy(self, target: Tensor, axis: Optional[int] = None) -> Tensor:
-        assert isinstance(target, Tensor), \
-            f"Cannot calculate Cross Entropy loss, invalid target type. Expected Tensor, got {type(target)}."
+        if DEBUG:
+            assert isinstance(target, Tensor), \
+                f"Cannot calculate Cross Entropy loss, invalid target type. Expected Tensor, got {type(target)}."
 
         #? NOTE: Mirko, 25. 12. 2023. 
         # PyTorch uses natural log here, might be relevant later
@@ -535,12 +550,14 @@ class Tensor:
         return self.assign(self.pow(other))
 
     def __matmul__(self, other) -> Tensor:
-        assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
+        if DEBUG:
+            assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
         
         return self.matmul(other)
     
     def __imatmul__(self, other) -> Tensor: 
-        assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
+        if DEBUG:
+            assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
         
         return self.assign(self.matmul(other))
 
@@ -557,14 +574,16 @@ class Tensor:
             assert False, f"Invalid type for Tensor equality: {type(other)}. Expected Tensor, int or float."
 
     def __lt__(self, other) -> list[bool]:
-        assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
+        if DEBUG:
+            assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
         if isinstance(other, int): 
             other = float(other)
 
         return self.data.is_elementwise_less_than(other)
     
     def __gt__(self, other) -> list[bool]:
-        assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
+        if DEBUG:
+            assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
         if isinstance(other, int): 
             other = float(other)
 

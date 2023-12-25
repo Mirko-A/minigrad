@@ -4,6 +4,8 @@ from enum import Enum, auto
 import numpy as np
 import math
 
+from minitorch.settings import DEBUG
+
 #! WARN: Mirko, 24. 12. 2023
 # In order for everything to work as expected, MiniBuffer data
 # must remain contiguous at all times. That means that operations
@@ -39,10 +41,11 @@ class MiniBuffer:
                  data: list[float], 
                  shape: tuple[int, ...], 
                  strides: Optional[tuple[int, ...]] = None):
-        assert isinstance(data, list) and all(isinstance(value, float) for value in data), \
-                f"Cannot construct buffer. Expected data type is list[float] but got: {type(data)}."
-        assert isinstance(shape, tuple) and all(isinstance(dim, int) for dim in shape), \
-                f"Cannot construct buffer. Expected shape type is tuple[int, ...] but got {type(shape)}"
+        if DEBUG:
+            assert isinstance(data, list) and all(isinstance(value, float) for value in data), \
+                    f"Cannot construct buffer. Expected data type is list[float] but got: {type(data)}."
+            assert isinstance(shape, tuple) and all(isinstance(dim, int) for dim in shape), \
+                    f"Cannot construct buffer. Expected shape type is tuple[int, ...] but got {type(shape)}"
         
         self.data = data
         self.shape = shape
@@ -114,26 +117,26 @@ class MiniBuffer:
     #* Unary operations
 
     def neg(self) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, ),
-                                                          MiniBuffer.UnaryOp.NEG,
-                                                          self)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_unary(0,
+                                                                0,
+                                                               MiniBuffer.UnaryOp.NEG,
+                                                               self)
 
         return MiniBuffer(out_data, self.shape)
 
     def log(self) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, ),
-                                                          MiniBuffer.UnaryOp.LOG,
-                                                          self)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_unary(0,
+                                                                0,
+                                                                MiniBuffer.UnaryOp.LOG,
+                                                                self)
 
         return MiniBuffer(out_data, self.shape)
 
     def log2(self) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, ),
-                                                          MiniBuffer.UnaryOp.LOG2,
-                                                          self)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_unary(0,
+                                                                0,
+                                                                MiniBuffer.UnaryOp.LOG2,
+                                                                self)
 
         return MiniBuffer(out_data, self.shape)
 
@@ -165,50 +168,50 @@ class MiniBuffer:
     #* Binary operations
 
     def add(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, 0),
-                                                          MiniBuffer.BinaryOp.ADD,
-                                                          self, other)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_binary(0,
+                                                                 (0, 0),
+                                                                 MiniBuffer.BinaryOp.ADD,
+                                                                 self, other)
 
         return MiniBuffer(out_data, self.shape)
     
     def sub(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, 0),
-                                                          MiniBuffer.BinaryOp.SUB,
-                                                          self, other)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_binary(0,
+                                                                 (0, 0),
+                                                                 MiniBuffer.BinaryOp.SUB,
+                                                                 self, other)
 
         return MiniBuffer(out_data, self.shape)
 
     def mul(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, 0),
-                                                          MiniBuffer.BinaryOp.MUL,
-                                                          self, other)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_binary(0,
+                                                                 (0, 0),
+                                                                 MiniBuffer.BinaryOp.MUL,
+                                                                 self, other)
     
         return MiniBuffer(out_data, self.shape)
     
     def div(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, 0),
-                                                          MiniBuffer.BinaryOp.DIV,
-                                                          self, other)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_binary(0,
+                                                                 (0, 0),
+                                                                 MiniBuffer.BinaryOp.DIV,
+                                                                 self, other)
 
         return MiniBuffer(out_data, self.shape)
     
     def pow(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, 0),
-                                                          MiniBuffer.BinaryOp.POW,
-                                                          self, other)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_binary(0,
+                                                                 (0, 0),
+                                                                 MiniBuffer.BinaryOp.POW,
+                                                                 self, other)
 
         return MiniBuffer(out_data, self.shape)
     
     def max(self, other: MiniBuffer) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_op(0,
-                                                          (0, 0),
-                                                          MiniBuffer.BinaryOp.MAX,
-                                                          self, other)
+        out_data = MiniBuffer._traverse_dims_and_apply_op_binary(0,
+                                                                 (0, 0),
+                                                                 MiniBuffer.BinaryOp.MAX,
+                                                                 self, other)
 
         return MiniBuffer(out_data, self.shape)
 
@@ -323,39 +326,46 @@ class MiniBuffer:
     #* Binary operator magic methods
 
     def __add__(self, other):
-        assert isinstance(other, MiniBuffer), f"Cannot perform addition with MiniBuffer and {type(other)}."
+        if DEBUG:
+            assert isinstance(other, MiniBuffer), f"Cannot perform addition with MiniBuffer and {type(other)}."
 
         return self.add(other)
     
     def __sub__(self, other):
-        assert isinstance(other, MiniBuffer), f"Cannot perform subtraction with MiniBuffer and {type(other)}."
+        if DEBUG:
+            assert isinstance(other, MiniBuffer), f"Cannot perform subtraction with MiniBuffer and {type(other)}."
 
         return self.sub(other)
 
     def __mul__(self, other):
-        assert isinstance(other, MiniBuffer), f"Cannot perform multiplication with MiniBuffer and {type(other)}."
+        if DEBUG:
+            assert isinstance(other, MiniBuffer), f"Cannot perform multiplication with MiniBuffer and {type(other)}."
 
         return self.mul(other)
 
     def __truediv__(self, other):
-        assert isinstance(other, MiniBuffer), f"Cannot perform division with MiniBuffer and {type(other)}."
+        if DEBUG:
+            assert isinstance(other, MiniBuffer), f"Cannot perform division with MiniBuffer and {type(other)}."
 
         return self.div(other)
     
     def __pow__(self, other):
-        assert isinstance(other, MiniBuffer), f"Cannot perform exponentiation with MiniBuffer and {type(other)}."
+        if DEBUG:
+            assert isinstance(other, MiniBuffer), f"Cannot perform exponentiation with MiniBuffer and {type(other)}."
 
         return self.pow(other)
 
     def __lt__(self, other):
-        assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
+        if DEBUG:
+            assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
         if isinstance(other, int):
             other = float(other)
 
         return self.is_elementwise_less_than(other)
     
     def __gt__(self, other):
-        assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
+        if DEBUG:
+            assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
         if isinstance(other, int):
             other = float(other)
 
@@ -425,39 +435,55 @@ class MiniBuffer:
     # All of the calls to this function return a list of floats
     # which we can just append to the initial empty list.
     @staticmethod
-    def _traverse_dims_and_apply_op(depth_idx: int,
-                                    current_positions: tuple[int, ...],
-                                    op: UnaryOp | BinaryOp,
-                                    *operands: MiniBuffer) -> list[float]:
+    def _traverse_dims_and_apply_op_binary(depth_idx: int,
+                                           current_positions: tuple[int, int],
+                                           op: BinaryOp,
+                                           x: MiniBuffer,
+                                           y: MiniBuffer) -> list[float]:
         out_data = []
 
-        if depth_idx == len(operands[0].shape) - 1:
-            for val_idx in range(operands[0].shape[depth_idx]):
-                x_val_pos = current_positions[0] + val_idx * operands[0].strides[depth_idx]
+        if depth_idx == len(x.shape) - 1:
+            for val_idx in range(x.shape[depth_idx]):
+                x_val_pos = current_positions[0] + val_idx * x.strides[depth_idx]
+                y_val_pos = current_positions[1] + val_idx * y.strides[depth_idx]
             
-                if isinstance(op, MiniBuffer.UnaryOp):
-                    out_data.append(MiniBuffer._apply_op_unary(op, 
-                                                               operands[0].data[x_val_pos]))
-                elif isinstance(op, MiniBuffer.BinaryOp):
-                    y_val_pos = current_positions[1] + val_idx * operands[1].strides[depth_idx]
-                    out_data.append(MiniBuffer._apply_op_binary(op, 
-                                                                operands[0].data[x_val_pos],
-                                                                operands[1].data[y_val_pos]))
-                else:
-                    assert False, f"Invalid operation: {op}."
+                out_data.append(MiniBuffer._apply_op_binary(op, 
+                                                            x.data[x_val_pos],
+                                                            y.data[y_val_pos]))
         else:
-            for dim_idx in range(operands[0].shape[depth_idx]):
-                x_pos = current_positions[0] + dim_idx * operands[0].strides[depth_idx]
-                next_pos = (x_pos, )
+            for dim_idx in range(x.shape[depth_idx]):
+                x_pos = current_positions[0] + dim_idx * x.strides[depth_idx]
+                y_pos = current_positions[1] + dim_idx * y.strides[depth_idx]
+    
+                next_pos = (x_pos, y_pos)
 
-                if isinstance(op, MiniBuffer.BinaryOp):
-                    y_pos = current_positions[1] + dim_idx * operands[1].strides[depth_idx]
-                    next_pos += (y_pos, )
+                out_data += MiniBuffer._traverse_dims_and_apply_op_binary(depth_idx + 1,
+                                                                          next_pos,
+                                                                          op,
+                                                                          x, y)
+        
+        return out_data
 
-                out_data += MiniBuffer._traverse_dims_and_apply_op(depth_idx + 1,
+    @staticmethod
+    def _traverse_dims_and_apply_op_unary(depth_idx: int,
+                                          current_position: int,
+                                          op: UnaryOp,
+                                          x: MiniBuffer) -> list[float]:
+        out_data = []
+
+        if depth_idx == len(x.shape) - 1:
+            for val_idx in range(x.shape[depth_idx]):
+                x_val_pos = current_position + val_idx * x.strides[depth_idx]
+            
+                out_data.append(MiniBuffer._apply_op_unary(op, x.data[x_val_pos]))
+        else:
+            for dim_idx in range(x.shape[depth_idx]):
+                next_pos = current_position + dim_idx * x.strides[depth_idx]
+
+                out_data += MiniBuffer._traverse_dims_and_apply_op_unary(depth_idx + 1,
                                                                    next_pos,
                                                                    op,
-                                                                   *operands)
+                                                                   x)
         
         return out_data
 
