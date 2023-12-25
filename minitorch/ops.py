@@ -37,11 +37,11 @@ class Log2(Function):
 #* Reduce operations
 
 class Sum(Function):
-    def forward(self, x: MiniBuffer, sum_axis: int):
-        self.sum_axis = sum_axis
-        self.sum_axis_size = x.shape[sum_axis]
+    def forward(self, x: MiniBuffer, axis: int):
+        self.sum_axis = axis
+        self.sum_axis_size = x.shape[axis]
 
-        return x.sum(sum_axis)
+        return x.sum(axis)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.expand(self.sum_axis, self.sum_axis_size)
@@ -164,13 +164,20 @@ class Shrink(Function):
         return chain_grad.pad(self.input_shape)
 
 class Expand(Function):
-    def forward(self, x: MiniBuffer, expansion_axis: int, expanded_size: int) -> MiniBuffer:
-        self.reduce_dim = expansion_axis
+    def forward(self, x: MiniBuffer, axis: int, expanded_size: int) -> MiniBuffer:
+        self.reduce_dim = axis
 
-        return x.expand(expansion_axis, expanded_size)
+        return x.expand(axis, expanded_size)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.sum(self.reduce_dim)
+
+class Cat(Function):
+    def forward(self, x: MiniBuffer, y: MiniBuffer, axis: int) -> MiniBuffer:
+        ...
+
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        ...
 
 #* Activation functions
 

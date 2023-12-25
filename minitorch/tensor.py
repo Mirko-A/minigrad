@@ -198,10 +198,23 @@ class Tensor:
         for dim_idx, (new_dim, current_dim) in enumerate(zip(new_shape, x.shape)):
             if new_dim > current_dim:
                 assert current_dim == 1, "Cannot expand along a non-singular dimension."
-                x = ops.Expand.apply(x, expansion_axis=dim_idx, expanded_size=new_dim)
+                x = ops.Expand.apply(x, axis=dim_idx, expanded_size=new_dim)
         
         return x
     
+    def cat(self, axis: int, *others: Tensor) -> Tensor:
+        assert all(isinstance(other, Tensor) for other in others), \
+            f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(others)}."
+        assert all(other.shape[axis] == self.shape[axis] for other in others), \
+            f"Cannot concatenate, all Tensors must have the same size ({self.shape[axis]}) along the concatenation axis."
+
+        x = self
+
+        for other in others:
+            x = ops.Cat.apply(x, other, axis=axis)
+
+        return x
+
     #* Unary operations
 
     def neg(self) -> Tensor:
@@ -215,28 +228,37 @@ class Tensor:
     
     # Reduce operations
 
-    def sum(self, sum_axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
+    def sum(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         x = self
 
-        def _sum(input: Tensor, sum_axis: int, keepdims: bool) -> Tensor:
-            assert isinstance(sum_axis, int), f"Cannot sum Tensor, invalid axis provided. Expected int but got {type(sum_axis)}."
-            assert abs(sum_axis) < len(input.shape), f"Cannot sum Tensor, invalid axis provided. Tensor shape is {input.shape} but {sum_axis}th dimension was provided."
+        def _sum(input: Tensor, axis: int, keepdims: bool) -> Tensor:
+            assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
+            assert abs(axis) < len(input.shape), f"Cannot calculate sum, invalid axis provided. Tensor shape is {input.shape} but {axis}th dimension was provided."
         
-            if sum_axis < 0:
-                sum_axis = len(input.shape) + sum_axis
+            # Negative axes allowed
+            if axis < 0:
+                axis = len(input.shape) + axis
 
-            shape_squeezed = [s for i,s in enumerate(input.shape) if i != sum_axis]
-            sum_res = ops.Sum.apply(input, sum_axis=sum_axis)
+            shape_squeezed = [s for i,s in enumerate(input.shape) if i != axis]
+            sum_res = ops.Sum.apply(input, axis=axis)
             
-            return sum_res if keepdims or sum_axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
+            return sum_res if keepdims or axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
         
-        if sum_axis is not None:
-            return _sum(x, sum_axis, keepdims)
+        if axis is not None:
+            return _sum(x, axis, keepdims)
         else:
             for axis_idx in range(len(self.shape)):
                 x = _sum(x, axis_idx, keepdims = True)
             
             return ops.Reshape.apply(x, new_shape=(1, ))
+
+    def mean(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
+        _sum = self.sum(axis, keepdims=keepdims)
+
+        if axis is not None:
+            return _sum / self.shape[axis]
+        else:
+            return _sum / math.prod(self.shape)
 
     #* Binary operations
 
@@ -315,12 +337,35 @@ class Tensor:
     
     def sigmoid(self) -> Tensor:
         return ops.Sigmoid.apply(self)
+    
+    def tanh(self) -> Tensor:
+        return 2 * (2 * self).sigmoid() - 1
 
     def relu(self) -> Tensor:
         return ops.Relu.apply(self)
     
+    def softmax(self, axis = -1) -> Tensor:
+        self_exp = self.exp()
+
+        return self_exp / self_exp.sum(axis, keepdims=True)
+
     #* Cost functions
-    # TODO: Implement MSE, cross_entropy
+
+    def MSE(self, target: Tensor, axis: Optional[int] = None) -> Tensor:
+        assert isinstance(target, Tensor), \
+            f"Cannot calculate MSE loss, invalid target type. Expected Tensor, got {type(target)}."
+
+        square_error = (self - target) ** 2
+        return square_error.mean(axis)
+
+    def cross_entropy(self, target: Tensor, axis: Optional[int] = None) -> Tensor:
+        assert isinstance(target, Tensor), \
+            f"Cannot calculate Cross Entropy loss, invalid target type. Expected Tensor, got {type(target)}."
+
+        #? NOTE: Mirko, 25. 12. 2023. 
+        # PyTorch uses natural log here, might be relevant later
+        log_input = self.log()
+        return -(target * log_input).sum(axis)
 
     #* Backpropagation
 
@@ -401,96 +446,133 @@ class Tensor:
     
     #* Binary operator magic methods
 
-    def __add__(self, other):
-        if not isinstance(other, Tensor):
+    def __add__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.add(other)
     
-    def __radd__(self, other):
-        if not isinstance(other, Tensor):
+    def __radd__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.add(other, True)
     
-    def __sub__(self, other):
-        if not isinstance(other, Tensor):
+    def __iadd__(self, other) -> Tensor: 
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
+
+        return self.assign(self.add(other))
+
+    def __sub__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.sub(other)
 
-    def __rsub__(self, other):
-        if not isinstance(other, Tensor):
+    def __rsub__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.sub(other, True)
 
-    def __mul__(self, other):
-        if not isinstance(other, Tensor):
+    def __isub__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
+
+        return self.assign(self.sub(other))
+
+    def __mul__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.mul(other)
     
-    def __rmul__(self, other):
-        other = Tensor(other)
+    def __rmul__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
 
         return self.mul(other, True)
 
-    def __truediv__(self, other):
-        if not isinstance(other, Tensor):
+    def __imul__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
+
+        return self.assign(self.mul(other))
+
+    def __truediv__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.div(other)
     
-    def __rtruediv__(self, other):
-        if not isinstance(other, Tensor):
+    def __rtruediv__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.div(other, True)
     
-    def __pow__(self, other):
-        if not isinstance(other, Tensor):
+    def __itruediv__(self, other) -> Tensor: 
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
+
+        return self.assign(self.div(other))
+
+    def __pow__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.pow(other)
 
-    def __rpow__(self, other):
-        if not isinstance(other, Tensor):
+    def __rpow__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.pow(other, True)
+    
+    def __ipow__(self, other) -> Tensor: 
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
 
-    def __matmul__(self, other):
+        return self.assign(self.pow(other))
+
+    def __matmul__(self, other) -> Tensor:
         assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
-
+        
         return self.matmul(other)
     
-    def __eq__(self, other):
+    def __imatmul__(self, other) -> Tensor: 
+        assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
+        
+        return self.assign(self.matmul(other))
+
+    def __eq__(self, other) -> bool | list[bool]:
         if isinstance(other, Tensor):
             assert self.shape == other.shape, f"Cannot compare {self.shape} and {other.shape} Tensors. Shapes must match."
+
             return self.data.is_equal_to(other.data)
         elif isinstance(other, (int, float)):
-            if isinstance(other, int):
-                other = float(other)
+            if isinstance(other, int): other = float(other)
+
             return self.data.is_elementwise_equal_to(other)
         else:
             assert False, f"Invalid type for Tensor equality: {type(other)}. Expected Tensor, int or float."
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> list[bool]:
         assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
-        if isinstance(other, int):
+        if isinstance(other, int): 
             other = float(other)
 
         return self.data.is_elementwise_less_than(other)
     
-    def __gt__(self, other):
+    def __gt__(self, other) -> list[bool]:
         assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
-        if isinstance(other, int):
+        if isinstance(other, int): 
             other = float(other)
 
         return self.data.is_elementwise_greater_than(other)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return id(self)
 
     #* Data handlers
@@ -522,11 +604,21 @@ class Tensor:
 
     #* Utility
 
+    #? NOTE: Mirko, 25. 12. 2023
+    # Some reshape operations require the Tensors shape
+    # to match the provided shape. This helper fn can
+    # be used to pad the Tensor with singular dimensions
+    # on the left (e.g. [m, n] -> [1, m, n]).
     @staticmethod
     def pad_shapes(shape_diff: int, x: Tensor) -> Tensor:
         padded_shape = (1,) * shape_diff + x.shape
         return ops.Reshape.apply(x, new_shape=padded_shape)
 
+    #? NOTE: Mirko, 25. 12. 2023
+    # Some reshape operations require the Tensors shape
+    # to match the provided shape. This helper fn can
+    # be used to squeeze the singular dimensions of the
+    # Tensor on the left (e.g. [1, m, n] -> [m, n]).
     @staticmethod
     def squeeze_shapes(shape_diff: int, x: Tensor) -> Tensor:
         squeezed_shape = x.shape[shape_diff:]

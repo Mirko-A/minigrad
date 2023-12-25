@@ -139,16 +139,16 @@ class MiniBuffer:
 
     #* Reduce operations
 
-    def sum(self, sum_axis: int) -> MiniBuffer:
+    def sum(self, axis: int) -> MiniBuffer:
         x = self
 
         # Same as input but with a 1 at the sum axis index
-        out_shape = [1 if dim_idx == sum_axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
+        out_shape = [1 if dim_idx == axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
         dim_order = [i for i in range(len(self.shape))]
 
         # Permute so sum axis is last
-        dim_order[sum_axis], dim_order[-1] = dim_order[-1], dim_order[sum_axis]
-        out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
+        dim_order[axis], dim_order[-1] = dim_order[-1], dim_order[axis]
+        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
         x = x.permute(dim_order)
         
         x = MiniBuffer(MiniBuffer._traverse_dims_and_sum_along_last(0,
@@ -156,7 +156,7 @@ class MiniBuffer:
                                                                     x), tuple(out_shape))
         
         # Permute back to original
-        out_shape[sum_axis], out_shape[-1] = out_shape[-1], out_shape[sum_axis]
+        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
         result = x.permute(dim_order)
 
         # Hack to make a contiguous MiniBuffer again
@@ -287,11 +287,11 @@ class MiniBuffer:
 
         return MiniBuffer(out_data, new_shape)
 
-    def expand(self, expansion_axis: int, expanded_size: int) -> MiniBuffer:
+    def expand(self, axis: int, expanded_size: int) -> MiniBuffer:
         out_data = self.data * expanded_size
 
         out_shape = [dim for dim in self.shape]
-        out_shape[expansion_axis] = expanded_size
+        out_shape[axis] = expanded_size
 
         #? NOTE: Mirko, 24. 12. 2023 
         # Since we're just multiplying the data array by
@@ -307,8 +307,8 @@ class MiniBuffer:
         # simply duplicating the original data expanded_size
         # times.
         out_strides = [stride for stride in self.strides]
-        corrected_input_shape = [1 if i == expansion_axis else self.shape[i] for i in range(len(self.shape))]
-        out_strides[expansion_axis] = math.prod(corrected_input_shape)
+        corrected_input_shape = [1 if i == axis else self.shape[i] for i in range(len(self.shape))]
+        out_strides[axis] = math.prod(corrected_input_shape)
 
         result = MiniBuffer(out_data, tuple(out_shape), tuple(out_strides))
 
