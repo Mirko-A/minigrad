@@ -1,47 +1,51 @@
 from minitorch.nn.module import Linear
 from minitorch.nn.module import Sequence
 from minitorch.nn.optim import Adam
-from minitorch.nn.optim import SGD
+from minitorch.nn.module import Sigmoid, Relu, Tanh, MSELoss, CrossEntropyLoss
 from minitorch.tensor import Tensor
 
 import torch
 
 import numpy as np
 
+# 0 1 2
+# 3 4 5
+# 6 7 8
+
+# 1 1 1
+
 def main1():
-    t = Tensor.arange(1, 10)
-    print(t.sqrt())
+    t = Tensor.arange(0, 9).reshape((3, 3))
+    y = Tensor([0, 1, 0])
+    print(t.softmax())
+    print(t.softmax().cross_entropy(y, -1))
 
 def main():
-    m0 = Linear(2, 4)
-    m1 = Linear(4, 2)
-    m2 = Linear(2, 2)
+    prki_net = Sequence(
+        Linear(2, 4),
+        Linear(4, 2),
+        Linear(2, 2),
+        Sigmoid()
+    )
+    loss = MSELoss()
 
-    params = []
-    params += m0.params()
-    params += m1.params()
-    params += m2.params()
-
-    adam = Adam(params, 0.05)
+    adam = Adam(prki_net.params(), 0.05)
 
     input = Tensor([[0, 0],
                     [1, 0],
                     [0, 1],
                     [1, 1]])
     target = Tensor([[0], 
-                           [1], 
-                           [1],
-                           [1]])
+                     [1], 
+                     [1],
+                     [1]])
 
     for epoch in range(50):
         adam.zero_grad()
 
-        x0 = m0(input)
-        x1 = m1(x0)
-        x2 = m2(x1)
-        pred = x2.sigmoid()
+        pred = prki_net(input)
 
-        l = ((target - pred) ** 2).sum()
+        l = loss(pred, target)
         l.backward()
         print(f"Loss: {l}")
         #print(pred)

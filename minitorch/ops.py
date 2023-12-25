@@ -197,7 +197,7 @@ class Relu(Function):
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad * MiniBuffer.masked_fill(MiniBuffer.full_like(self.result, 0.0),
-                                                   MiniBuffer.full_like(self.result, 0.0) < self.result,
+                                                   self.result > 0,
                                                    1.0)
 
 # class Sigmoid(Function):

@@ -333,7 +333,6 @@ class Tensor:
         return (x*y).sum(-1)
 
     #* Activation functions
-    # TODO: Implement tanh, softmax
     
     def sigmoid(self) -> Tensor:
         return ops.Sigmoid.apply(self)
@@ -402,7 +401,6 @@ class Tensor:
                     assert grad.shape == parent.shape, f"Grad shape must match Tensor shape, {grad.shape} != {parent.shape}"
                     parent.grad = grad if parent.grad is None else (parent.grad + grad)
             
-            # TODO: Bring back if needed (needs __deletable__ = '_ctx'?)
             del node._ctx
 
     #* Broadcasting
