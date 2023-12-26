@@ -156,42 +156,31 @@ class Tensor:
         order[axis0], order[axis1] = order[axis1], order[axis0]
         return ops.Permute.apply(x, order=order)
 
-    #* Reshape methods
-
-    #? NOTE: Mirko, 24. 12. 2023 
-    # These are different from the Reshape movement operation. These operations
-    # add/remove elements of the tensor whereas the Reshape operation just
-    # changes the shape without modifying the elements.
+    #* Mutate methods
     
-    def pad(self, new_shape: tuple[int, ...]) -> Tensor:
+    def pad(self, axis: int, pad_sizes: tuple[int, int], pad_type: MiniBuffer.PadType = MiniBuffer.PadType.ZERO) -> Tensor:
         if DEBUG:
-            assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
-                    f"Cannot pad, new shape expected type is tuple[int, ...] but got type{new_shape}."
-        assert len(new_shape) >= len(self.shape), \
-            f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
-            
-        x = self
-        shape_diff = len(new_shape) - len(x.shape)
+            assert isinstance(pad_sizes, tuple) and all(isinstance(size, int) for size in pad_sizes), \
+                    f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{pad_sizes}."
+
+        # Negative axes allowed
+        if axis < 0:
+            axis = len(self.shape) + axis
         
-        if shape_diff > 0:
-            x = Tensor.pad_shapes(shape_diff, x)
+        return ops.Pad.apply(self, axis=axis, pad_sizes=pad_sizes, pad_type=pad_type)
 
-        return ops.Pad.apply(x, new_shape=new_shape)
-
-    def shrink(self, new_shape: tuple[int, ...]) -> Tensor:
+    def shrink(self, axis: int, shrink_sizes: tuple[int, int]) -> Tensor:
         if DEBUG:
-            assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
-                    f"Cannot shrink, new shape expected type is tuple[int, ...] but got type{new_shape}."
-        assert len(new_shape) <= len(self.shape), \
-            f"Cannot shrink, new shape dimensionality {new_shape} is greater than original one {self.shape}."
-        
-        x = self
-        shape_diff = len(new_shape) - len(x.shape)
-        
-        if shape_diff > 0:
-            x = Tensor.squeeze_shapes(shape_diff, x)
+            assert isinstance(shrink_sizes, tuple) and all(isinstance(dim, int) for dim in shrink_sizes), \
+                    f"Cannot shrink, new shape expected type is tuple[int, ...] but got type{shrink_sizes}."
+        assert sum(shrink_sizes) < self.shape[axis], \
+            f"Cannot shrink, shrink sizes are {shrink_sizes} but size of dimension[{axis}] is {self.shape[axis]}. Operation would create an empty row."
 
-        return ops.Shrink.apply(x, new_shape=new_shape)
+        # Negative axes allowed
+        if axis < 0:
+            axis = len(self.shape) + axis
+
+        return ops.Shrink.apply(self, axis=axis, shrink_sizes=shrink_sizes)
     
     def expand(self, new_shape: tuple[int, ...]) -> Tensor:
         if DEBUG:

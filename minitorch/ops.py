@@ -128,45 +128,42 @@ class Reshape(Function):
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.reshape(self.input_shape)
 
-#* Reshape operations
-
-#? NOTE: Mirko, 24. 12. 2023 
-# These are different from the Reshape movement operation. These operations
-# add/remove elements of the tensor whereas the Reshape operation just
-# changes the shape without modifying the elements.
+#* Mutate operations
 
 class Pad(Function):
-    def forward(self, x: MiniBuffer, new_shape: tuple[int, ...]) -> MiniBuffer:
-        self.input_shape = x.shape
+    def forward(self, x: MiniBuffer, axis: int, pad_sizes: tuple[int, int], pad_type: MiniBuffer.PadType) -> MiniBuffer:
+        self.pad_axis = axis
+        self.pad_sizes = pad_sizes
 
-        return x.pad(new_shape)
+        return x.pad(axis, pad_sizes, pad_type)
 
     # TODO: Mirko, 24. 12. 2023 
     # It makes sense that shrink is opposite of pad but this
     # has not been checked!
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.shrink(self.input_shape)
+        return chain_grad.shrink(self.pad_axis, self.pad_sizes)
 
 class Shrink(Function):
-    def forward(self, x: MiniBuffer, new_shape: tuple[int, ...]) -> MiniBuffer:
-        self.input_shape = x.shape
+    def forward(self, x: MiniBuffer, axis: int, shrink_sizes: [int, int]) -> MiniBuffer:
+        self.shrink_axis = axis
+        self.shrink_sizes = shrink_sizes
 
-        return x.shrink(new_shape)
+        return x.shrink(axis, shrink_sizes)
 
     # TODO: Mirko, 24. 12. 2023  
     # It makes sense that pad is opposite of shrink but this
     # has not been checked!
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.pad(self.input_shape)
+        return chain_grad.pad(self.shrink_axis, self.shrink_sizes, MiniBuffer.PadType.ZERO)
 
 class Expand(Function):
     def forward(self, x: MiniBuffer, axis: int, expanded_size: int) -> MiniBuffer:
-        self.reduce_dim = axis
+        self.reduce_axis = axis
 
         return x.expand(axis, expanded_size)
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        return chain_grad.sum(self.reduce_dim)
+        return chain_grad.sum(self.reduce_axis)
 
 class Cat(Function):
     def forward(self, x: MiniBuffer, y: MiniBuffer, axis: int) -> MiniBuffer:

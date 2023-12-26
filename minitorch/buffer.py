@@ -15,11 +15,13 @@ from minitorch.settings import DEBUG
 
 class MiniBuffer:
     __slots__ = ("data", "shape", "strides")
-    class ReshapeOp(Enum):
-        PAD = 0
-        SHRINK = auto()
+    class PadType(Enum):
+        ZERO = 0
+        EDGE = auto()
+        # TODO: Mirko, 26. 12. 2023
+        # Maybe add ramp if needed
 
-    def __init__(self, 
+    def __init__(self,
                  data: list[float], 
                  shape: tuple[int, ...], 
                  strides: Optional[tuple[int, ...]] = None):
@@ -79,11 +81,7 @@ class MiniBuffer:
 
     @staticmethod
     def masked_fill(input: MiniBuffer, mask: list[bool], value: float) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_masked_fill(0,
-                                                             0,
-                                                             mask,
-                                                             value,
-                                                             input)
+        out_data = [value if mask[val_idx] else val for val_idx, val in enumerate(input.data)]
         
         return MiniBuffer(out_data, input.shape)
 
@@ -205,32 +203,61 @@ class MiniBuffer:
 
         result = MiniBuffer(self.data, out_shape, strides=out_strides)
 
-        return result.contiguous(out_shape)
+        return result
 
-    #* Reshape methods
+    #* Mutate methods
     
     #? NOTE: Mirko, 24. 12. 2023 
     # These are different from the reshape() fn. These operations
     # add/remove elements of the tensor whereas the reshape() fn just
     # changes the shape without modifying the elements.
     
-    def pad(self, new_shape: tuple[int, ...]) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_reshape_op(0,
-                                                                  0,
-                                                                  MiniBuffer.ReshapeOp.PAD,
-                                                                  new_shape,
-                                                                  self)
+    def pad(self, axis: int, pad_sizes: tuple[int, int], pad_type: MiniBuffer.PadType) -> MiniBuffer:
+        x = self
 
-        return MiniBuffer(out_data, new_shape)
+        # Same as input but with a shape[axis] + sum(pad_sizes) at the sum axis index
+        out_shape = [self.shape[dim_idx] + sum(pad_sizes) if dim_idx == axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
+        dim_order = [i for i in range(len(self.shape))]
+
+        # Permute so sum axis is last
+        dim_order[axis], dim_order[-1] = dim_order[-1], dim_order[axis]
+        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
+        x = x.permute(dim_order)
+
+        x = MiniBuffer(MiniBuffer._traverse_dims_and_pad_along_last(0,
+                                                                    0,
+                                                                    pad_sizes,
+                                                                    pad_type,
+                                                                    x), tuple(out_shape))
+        
+        # Permute back to original
+        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
+        result = x.permute(dim_order)
+
+        return result.contiguous(tuple(out_shape))
     
-    def shrink(self, new_shape: tuple[int, ...]) -> MiniBuffer:
-        out_data = MiniBuffer._traverse_dims_and_apply_reshape_op(0,
-                                                                  0,
-                                                                  MiniBuffer.ReshapeOp.SHRINK,
-                                                                  new_shape,
-                                                                  self)
+    def shrink(self, axis: int, shrink_sizes: [int, int]) -> MiniBuffer:
+        x = self
 
-        return MiniBuffer(out_data, new_shape)
+        # Same as input but with a 1 at the sum axis index
+        out_shape = [self.shape[dim_idx] - sum(shrink_sizes) if dim_idx == axis else self.shape[dim_idx] for dim_idx in range(len(self.shape))]
+        dim_order = [i for i in range(len(self.shape))]
+
+        # Permute so sum axis is last
+        dim_order[axis], dim_order[-1] = dim_order[-1], dim_order[axis]
+        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
+        x = x.permute(dim_order)
+        
+        x = MiniBuffer(MiniBuffer._traverse_dims_and_shrink_along_last(0,
+                                                                       0,
+                                                                       shrink_sizes,
+                                                                       x), tuple(out_shape))
+        
+        # Permute back to original
+        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
+        result = x.permute(dim_order)
+
+        return result.contiguous(tuple(out_shape))
 
     def expand(self, axis: int, expanded_size: int) -> MiniBuffer:
         out_data = self.data * expanded_size
@@ -416,64 +443,61 @@ class MiniBuffer:
         return out_data
 
     @staticmethod
-    def _traverse_dims_and_apply_reshape_op(depth_idx: int,
-                                            current_position: int,
-                                            op: ReshapeOp,
-                                            new_shape: tuple[int, ...],
-                                            x: MiniBuffer) -> list[float]:
+    def _traverse_dims_and_pad_along_last(depth_idx: int,
+                                          current_position: int,
+                                          pad_sizes: tuple[int, int],
+                                          pad_type: PadType,
+                                          x: MiniBuffer) -> list[float]:
         out_data = []
 
-        if depth_idx == len(new_shape) - 1:
-            if op == MiniBuffer.ReshapeOp.PAD:
-                current_dim = MiniBuffer._pad(depth_idx, 
-                                              current_position, 
-                                              new_shape, 
-                                              x)
-            elif op == MiniBuffer.ReshapeOp.SHRINK:
-                current_dim = MiniBuffer._shrink(depth_idx, 
-                                                 current_position, 
-                                                 new_shape, 
-                                                 x)
+        if depth_idx == len(x.shape) - 1:
+            out_row = []
+
+            for val_idx in range(x.shape[depth_idx]):
+                val_pos = current_position + val_idx * x.strides[depth_idx]
+                out_row.append(x.data[val_pos])
+
+            if pad_type == MiniBuffer.PadType.ZERO:
+                out_row = [0]*pad_sizes[0] + out_row + [0]*pad_sizes[1]
+            elif pad_type == MiniBuffer.PadType.EDGE:
+                out_row = out_row[0]*pad_sizes[0] + out_row + out_row[-1]*pad_sizes[1]
             else:
-                assert False, f"Invalid operation: {op}."
+                assert False, f"Invalid pad type: {pad_type}."
             
-            out_data += current_dim
+            out_data += out_row
         else:
-            for dim_idx in range(new_shape[depth_idx]):
+            for dim_idx in range(x.shape[depth_idx]):
                 next_pos = current_position + dim_idx * x.strides[depth_idx]
-                out_data += MiniBuffer._traverse_dims_and_apply_reshape_op(depth_idx + 1,
-                                                                           next_pos,
-                                                                           op,
-                                                                           new_shape,
-                                                                           x)
+                out_data += MiniBuffer._traverse_dims_and_pad_along_last(depth_idx + 1,
+                                                                         next_pos,
+                                                                         pad_sizes,
+                                                                         pad_type,
+                                                                         x)
         
         return out_data
 
     @staticmethod
-    def _traverse_dims_and_masked_fill(depth_idx: int,
-                                       current_position: int,
-                                       mask: list[bool],
-                                       value: float,
-                                       x: MiniBuffer) -> list[float]:
+    def _traverse_dims_and_shrink_along_last(depth_idx: int,
+                                             current_position: int,
+                                             shrink_sizes: tuple[int, int],
+                                             x: MiniBuffer) -> list[float]:
         out_data = []
 
         if depth_idx == len(x.shape) - 1:
+            out_row = []
+
             for val_idx in range(x.shape[depth_idx]):
                 val_pos = current_position + val_idx * x.strides[depth_idx]
-                should_fill = mask[val_pos]
-                
-                if should_fill:
-                    out_data.append(value)
-                else:
-                    out_data.append(x.data[val_pos])
+                out_row.append(x.data[val_pos])
+            
+            out_data += out_row[shrink_sizes[0]:len(out_row) - shrink_sizes[1]]
         else:
             for dim_idx in range(x.shape[depth_idx]):
                 next_pos = current_position + dim_idx * x.strides[depth_idx]
-                out_data += MiniBuffer._traverse_dims_and_masked_fill(depth_idx + 1,
-                                                                      next_pos,
-                                                                      mask,
-                                                                      value,
-                                                                      x)
+                out_data += MiniBuffer._traverse_dims_and_shrink_along_last(depth_idx + 1,
+                                                                            next_pos,
+                                                                            shrink_sizes,
+                                                                            x)
         
         return out_data
 
@@ -498,39 +522,7 @@ class MiniBuffer:
                                                                x)
         
         return out_data
-
-    @staticmethod
-    def _pad(depth_idx: int,
-             current_position: int,
-             new_shape: tuple[int, ...],
-             x: MiniBuffer) -> list[float]:
-        current_dim = []
-
-        for val_idx in range(new_shape[depth_idx]):
-            val_pos = current_position + val_idx * x.strides[depth_idx]
-                
-            if val_idx < x.shape[depth_idx] and val_pos < len(x.data):
-                current_dim.append(x.data[val_pos])
-            else:
-                current_dim.append(0.0)
-
-        return current_dim
-
-    @staticmethod
-    def _shrink(depth_idx: int,
-                current_position: int,
-                new_shape: tuple[int, ...],
-                x: MiniBuffer) -> list[float]:
-        current_dim = []
-
-        for val_idx in range(new_shape[depth_idx]):
-            val_pos = current_position + val_idx * x.strides[depth_idx]
-
-            if len(current_dim) < new_shape[depth_idx]:
-                current_dim.append(x.data[val_pos])
-
-        return current_dim
-
+    
     #? NOTE: Mirko, 24. 12. 2023 
     # This only works with contiguous MiniBuffers, so
     # you better make sure to keep them contiguous at
