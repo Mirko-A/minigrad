@@ -111,6 +111,19 @@ class Tensor:
         
         return Tensor(MiniBuffer.tril(input.data, diagonal), input.requires_grad)
 
+    @staticmethod
+    def concat(axis: int, *inputs: Tensor) -> Tensor:
+        if DEBUG:
+            assert all(isinstance(input, Tensor) for input in inputs), \
+                f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(inputs)}."
+            
+        x = inputs[0]
+
+        for y in inputs[1:]:
+            x = x.cat(axis, y)
+
+        return x
+
     #* Movement methods
     
     #? NOTE: Mirko, 24. 12. 2023  
@@ -202,29 +215,25 @@ class Tensor:
         
         return x
     
-    def cat(self, axis: int, *others: Tensor) -> Tensor:
-        if DEBUG:
-            assert all(isinstance(other, Tensor) for other in others), \
-                f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(others)}."
-        assert all(other.shape == self.shape for other in others), \
-            f"Cannot concatenate, all Tensors must have the same size ({self.shape[axis]}) along the concatenation axis."
+    def cat(self, axis: int, other: Tensor) -> Tensor:
+        x, y = self, other
 
-        x = self
+        if DEBUG:
+            assert isinstance(y, Tensor), \
+                f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(y)}."
+        assert all(x_dim == y_dim for dim_idx, (x_dim, y_dim) in enumerate(zip(x.shape, y.shape)) if dim_idx != axis), \
+            f"Cannot concatenate, both Tensors must have the same shape along all axes except the one they're being concatenated along ({x.shape}, {y.shape})."
+
         # Negative axes allowed
         if axis < 0:
             axis = len(self.shape) + axis
 
-        def _cat(x: Tensor, y: Tensor, axis: int) -> Tensor:
-            cat_pad_size = x.shape[axis]
-            x = x.pad(axis, [0, cat_pad_size])
-            y = y.pad(axis, [cat_pad_size, 0])
+        x_pad_size = y.shape[axis]
+        y_pad_size = x.shape[axis]
+        x = x.pad(axis, [0, x_pad_size])
+        y = y.pad(axis, [y_pad_size, 0])
 
-            return x + y
-
-        for other in others:
-            x = _cat(x, other, axis)
-
-        return x
+        return x + y
 
     #* Unary operations
 
