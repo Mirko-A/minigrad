@@ -3,9 +3,11 @@ from minitorch.nn.module import Sequence
 from minitorch.nn.optim import Adam
 from minitorch.nn.module import Sigmoid, Relu, Tanh, MSELoss, CrossEntropyLoss
 from minitorch.tensor import Tensor
+from minitorch import buffer
+
+import time
 
 import torch
-
 import numpy as np
 
 # 0 1 2
@@ -15,10 +17,14 @@ import numpy as np
 # 1 1 1
 
 def main1():
-    t = Tensor.arange(0, 9).reshape((3, 3))
-    y = Tensor([0, 1, 0])
-    print(t.softmax())
-    print(t.softmax().cross_entropy(y, -1))
+    t = Tensor.arange(0, 3 * 3, True).reshape((3, 3))
+    t = t.pad(0, [1, 1])
+    print(t)
+    mask = t == 0.0
+    print(mask)
+
+    t = Tensor.masked_fill(t, mask, 1.3)
+    print(t)
 
 def main():
     prki_net = Sequence(
@@ -40,7 +46,9 @@ def main():
                      [1],
                      [1]])
 
-    for epoch in range(50):
+    start = time.time()
+
+    for epoch in range(500):
         adam.zero_grad()
 
         pred = prki_net(input)
@@ -48,9 +56,13 @@ def main():
         l = loss(pred, target)
         l.backward()
         print(f"Loss: {l}")
-        #print(pred)
 
         adam.step()
+
+    
+    print(pred)
+
+    print(f"Total time (new code): {time.time() - start}")
 
 if __name__ == "__main__":
     main()
