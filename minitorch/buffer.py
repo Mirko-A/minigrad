@@ -11,7 +11,10 @@ from minitorch.settings import DEBUG
 # contiguous at all times. That means that operations which involve permu-
 # ting the MiniBuffer or manually calculating the strides must be, at the 
 # end, followed by a call to MiniBuffer.contiguous() in order to create a
-# new, contiguous MiniBuffer from the current one's data.
+# new, contiguous MiniBuffer from the current one's data. 
+#? NOTE: Mirko, 27. 12. 2023
+# The permute() fn now ends with a call to contiguous() so it is not needed
+# to do it manually after each permutation.
 
 class MiniBuffer:
     __slots__ = ("data", "shape", "strides")
@@ -131,9 +134,8 @@ class MiniBuffer:
         
         # Permute back to original
         out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
-        result = x.permute(dim_order)
 
-        return result.contiguous(tuple(out_shape))
+        return x.permute(dim_order)
         
     #* Binary operations
 
@@ -203,7 +205,7 @@ class MiniBuffer:
 
         result = MiniBuffer(self.data, out_shape, strides=out_strides)
 
-        return result
+        return result.contiguous(out_shape)
 
     #* Mutate methods
     
@@ -231,10 +233,8 @@ class MiniBuffer:
                                                                     x), tuple(out_shape))
         
         # Permute back to original
-        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
-        result = x.permute(dim_order)
 
-        return result.contiguous(tuple(out_shape))
+        return x.permute(dim_order)
     
     def shrink(self, axis: int, shrink_sizes: [int, int]) -> MiniBuffer:
         x = self
@@ -254,10 +254,8 @@ class MiniBuffer:
                                                                        x), tuple(out_shape))
         
         # Permute back to original
-        out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
-        result = x.permute(dim_order)
 
-        return result.contiguous(tuple(out_shape))
+        return x.permute(dim_order)
 
     def expand(self, axis: int, expanded_size: int) -> MiniBuffer:
         out_data = self.data * expanded_size
