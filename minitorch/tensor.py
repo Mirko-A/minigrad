@@ -206,13 +206,23 @@ class Tensor:
         if DEBUG:
             assert all(isinstance(other, Tensor) for other in others), \
                 f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(others)}."
-        assert all(other.shape[axis] == self.shape[axis] for other in others), \
+        assert all(other.shape == self.shape for other in others), \
             f"Cannot concatenate, all Tensors must have the same size ({self.shape[axis]}) along the concatenation axis."
 
         x = self
+        # Negative axes allowed
+        if axis < 0:
+            axis = len(self.shape) + axis
+
+        def _cat(x: Tensor, y: Tensor, axis: int) -> Tensor:
+            cat_pad_size = x.shape[axis]
+            x = x.pad(axis, [0, cat_pad_size])
+            y = y.pad(axis, [cat_pad_size, 0])
+
+            return x + y
 
         for other in others:
-            x = ops.Cat.apply(x, other, axis=axis)
+            x = _cat(x, other, axis)
 
         return x
 

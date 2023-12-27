@@ -164,14 +164,7 @@ class Expand(Function):
 
     def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.sum(self.reduce_axis)
-
-class Cat(Function):
-    def forward(self, x: MiniBuffer, y: MiniBuffer, axis: int) -> MiniBuffer:
-        ...
-
-    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
-        ...
-
+    
 #* Activation functions
 
 class Sigmoid(Function):

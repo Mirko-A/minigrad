@@ -63,7 +63,7 @@ class Adam(Optimizer):
     def step(self) -> None:
         for i, t in enumerate(self.params):
             assert t.grad is not None
-            g = t.grad + self.wd * t.detach()
+            g = t.grad
 
             self.m[i].assign(self.b1 * self.m[i] + (1.0 - self.b1) * g)
             self.v[i].assign(self.b2 * self.v[i] + (1.0 - self.b2) * (g * g))
@@ -71,6 +71,6 @@ class Adam(Optimizer):
             m_hat = self.m[i] / (1.0 - self.b1**(i + 1))
             v_hat = self.v[i] / (1.0 - self.b2**(i + 1))
 
-            up = (m_hat / (v_hat.sqrt() + self.eps))
+            up = m_hat / (v_hat.sqrt() + self.eps)
 
-            t.assign(t.detach() - self.lr * up)
+            t.assign(t.detach() - self.lr * up + self.wd * t.detach())
