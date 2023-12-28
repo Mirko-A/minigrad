@@ -1,7 +1,5 @@
 # minitorch
 
----
-
 Minitorch is a small-scale attempt to replicate a subset of the PyTorch framework. It is (being) developed for educational purposes. It is written in Python and the current version uses no third-party libraries whatsoever.
 
 ### Repository structure
