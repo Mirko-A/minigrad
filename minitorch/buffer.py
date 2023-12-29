@@ -4,7 +4,8 @@ from enum import Enum, auto
 import numpy as np
 import math
 
-from minitorch.settings import DEBUG
+import cpp_backend
+from minitorch.settings import DEBUG, USE_CPP_BACKEND
 
 #! WARN: Mirko, 24. 12. 2023
 # In order for everything to work as expected, MiniBuffer data must remain
@@ -128,9 +129,13 @@ class MiniBuffer:
         out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
         x = x.permute(dim_order)
         
-        x = MiniBuffer(MiniBuffer._traverse_dims_and_sum_along_last(0,
-                                                                    0,
-                                                                    x), tuple(out_shape))
+        if USE_CPP_BACKEND:
+            row_sum = cpp_backend.row_sum(x.data, list(x.shape), list(x.strides))
+        else:
+            row_sum = MiniBuffer._traverse_dims_and_sum_along_last(0,
+                                                                   0,
+                                                                   x)
+        x = MiniBuffer(row_sum, tuple(out_shape))
         
         # Permute back to original
         out_shape[axis], out_shape[-1] = out_shape[-1], out_shape[axis]
@@ -346,7 +351,17 @@ class MiniBuffer:
     # As most operations on MiniBuffers rely on them being contiguous, all
     # such* operations shall be followed up with a call to this function.
     def contiguous(self, shape: tuple[int, ...]) -> MiniBuffer:
-        return MiniBuffer(MiniBuffer._traverse_dims_and_collect_data(0, 0, self), shape)
+        data = self.data
+        shape = list(self.shape)
+        strides = list(self.strides)
+
+        if USE_CPP_BACKEND:
+            contiguous_data = cpp_backend.collect_data(data, shape, strides)
+        else:
+            contiguous_data = MiniBuffer._traverse_dims_and_collect_data(0,
+                                                                         0,
+                                                                         self)
+        return MiniBuffer(contiguous_data, tuple(shape))
 
     def is_scalar(self) -> bool:
         return len(self.shape) == 1
@@ -394,26 +409,29 @@ class MiniBuffer:
                 strides += (math.prod(shape[dim_idx + 1:]),)
 
         return strides
-
+    
     @staticmethod
     def _traverse_dims_and_collect_data(depth_idx: int,
                                         current_position: int,
                                         x: MiniBuffer) -> list[float]:
         out_data = []
+        stack = []
 
-        if depth_idx == len(x.shape) - 1:
-            for val_idx in range(x.shape[depth_idx]):
-                val_pos = current_position + val_idx * x.strides[depth_idx]
-            
-                out_data.append(x.data[val_pos])
-        else:
-            for dim_idx in range(x.shape[depth_idx]):
-                next_pos = current_position + dim_idx * x.strides[depth_idx]
+        while True:
+            if depth_idx == len(x.shape) - 1:
+                for val_idx in range(x.shape[depth_idx]):
+                    val_pos = current_position + val_idx * x.strides[depth_idx]
+                    out_data.append(x.data[val_pos])
+            else:
+                for dim_idx in reversed(range(x.shape[depth_idx])):
+                    next_pos = current_position + dim_idx * x.strides[depth_idx]
+                    stack.append((depth_idx + 1, next_pos))
 
-                out_data += MiniBuffer._traverse_dims_and_collect_data(depth_idx + 1,
-                                                                       next_pos,
-                                                                       x)
-        
+            if not stack:
+                break
+
+            depth_idx, current_position = stack.pop()
+
         return out_data
 
     @staticmethod
