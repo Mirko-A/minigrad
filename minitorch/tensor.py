@@ -653,6 +653,7 @@ class Tensor:
         return self.data.is_scalar()
     
     def is_square(self) -> bool:
+        assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
         return self.data.is_square()
 
     def __repr__(self) -> str:

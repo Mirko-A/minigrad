@@ -367,7 +367,6 @@ class MiniBuffer:
         return len(self.shape) == 1
 
     def is_square(self) -> bool:
-        assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
         return self.shape[-2] == self.shape[-1]
 
     def __getitem__(self, keys: tuple[int, ...]) -> list[float]:

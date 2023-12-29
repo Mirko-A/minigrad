@@ -3,12 +3,14 @@ from minitorch.nn.module import Sequence
 from minitorch.nn.optim import Adam
 from minitorch.nn.module import Sigmoid, Relu, Tanh, MSELoss, CrossEntropyLoss
 from minitorch.tensor import Tensor
-from minitorch import buffer
+from minitorch.buffer import MiniBuffer
 
 import time
 
 import torch
 import numpy as np
+
+import cpp_backend
 
 # 0 1 2
 # 3 4 5
@@ -16,17 +18,30 @@ import numpy as np
 
 # 1 1 1
 
-def main1():
-    t = Tensor.arange(0, 3 * 3, True).reshape((3, 3))
-    t = t.pad(0, [1, 1])
-    print(t)
-    mask = t == 0.0
-    print(mask)
-
-    t = Tensor.masked_fill(t, mask, 1.3)
-    print(t)
-
 def main():
+    start = time.time()
+
+    #b1 = MiniBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], (1, 12))
+    #b2 = MiniBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], (1, 12))
+
+    b1 = cpp_backend.TestBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [1, 12])
+    b2 = cpp_backend.TestBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [1, 12])
+    
+    for _ in range(500000):
+        x = -b1.log2()
+        #x = b1 * b2
+
+    #print(x.data)
+    print(x.get_data())
+    print(f"Time: {time.time() - start}")
+
+def main0():
+    t = Tensor.arange(0, 3 * 3, True).reshape((3, 3))
+    print(t)
+    x = t.sum(0)
+    print(x)
+
+def main1():
     prki_net = Sequence(
         Linear(2, 4),
         Linear(4, 2),
@@ -55,12 +70,12 @@ def main():
 
         l = loss(pred, target)
         l.backward()
-        print(f"Loss: {l}")
+        #print(f"Loss: {l}")
 
         adam.step()
 
-    
     print(pred)
+    print(l)
 
     print(f"Total time (new code): {time.time() - start}")
 

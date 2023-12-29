@@ -1,6 +1,9 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/operators.h>
 #include <pybind11/stl.h>
 #include <stack>
+
+#include "Buffer.h"
 
 std::vector<float> row_sum(const std::vector<float>& data,
                            const std::vector<int>& shape,
@@ -8,8 +11,9 @@ std::vector<float> row_sum(const std::vector<float>& data,
 {
     int depth_idx = 0;
     int current_position = 0;
-    std::vector<float> out_data;
-    std::stack<std::pair<int, int>> stack;
+    std::stack<std::pair<int, int>> stack{};
+    std::vector<float> out_data{};
+    out_data.reserve(data.size() / shape.back());
 
     while (true) 
     {
@@ -52,8 +56,9 @@ std::vector<float> collect_data(const std::vector<float>& data,
 {
     int depth_idx = 0;
     int current_position = 0;
-    std::vector<float> out_data;
-    std::stack<std::pair<int, int>> stack;
+    std::stack<std::pair<int, int>> stack{};
+    std::vector<float> out_data{};
+    out_data.reserve(data.size());
 
     while (true) 
     {
@@ -91,6 +96,19 @@ std::vector<float> collect_data(const std::vector<float>& data,
 PYBIND11_MODULE(cpp_backend, m)
 {
     m.doc() = "C++ backend for the minitorch library.";
+
+    pybind11::class_<TestBuffer>(m, "TestBuffer")
+            .def(pybind11::init<const std::vector<float>&, const std::vector<int>&>())
+            .def("get_data", &TestBuffer::get_data)
+            .def("get_shape", &TestBuffer::get_shape)
+            .def("get_strides", &TestBuffer::get_strides)
+            .def(-pybind11::self)
+            .def("log", &TestBuffer::log)
+            .def("log2", &TestBuffer::log2)
+            .def(pybind11::self + pybind11::self)
+            .def(pybind11::self - pybind11::self)
+            .def(pybind11::self * pybind11::self)
+            .def(pybind11::self / pybind11::self);
 
     m.def("row_sum", &row_sum, "Sum a contiguous array along its rows");
     m.def("collect_data", &collect_data, "Collect provided data into a contiguous array");
