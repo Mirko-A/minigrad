@@ -18,21 +18,20 @@ import cpp_backend
 
 # 1 1 1
 
-def main():
+def main1():
     start = time.time()
 
-    #b1 = MiniBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], (1, 12))
-    #b2 = MiniBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], (1, 12))
+    t = Tensor.arange(0, 8, True).reshape([1, 1, 8])
+    #print(t)
+    #t2 = Tensor.arange(0, 16).reshape([2, 2, 2, 2])
 
-    b1 = cpp_backend.TestBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [1, 12])
-    b2 = cpp_backend.TestBuffer([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0], [1, 12])
-    
-    for _ in range(500000):
-        x = -b1.log2()
-        #x = b1 * b2
+    #print(t)
+    t2 = t.expand([2, 2, 8])
+    print(t2)
+    t3 = t2.sum()
+    print(t3)
+    t3.backward()
 
-    #print(x.data)
-    print(x.get_data())
     print(f"Time: {time.time() - start}")
 
 def main0():
@@ -41,7 +40,7 @@ def main0():
     x = t.sum(0)
     print(x)
 
-def main1():
+def main():
     prki_net = Sequence(
         Linear(2, 4),
         Linear(4, 2),
