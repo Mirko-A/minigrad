@@ -6,7 +6,8 @@ ext_modules = [
     Pybind11Extension(
         "cpp_backend",
         sorted(glob("cpp_backend/*.cpp")),
-    ),
+        extra_compile_args=["/DEBUG"]
+    )
 ]
 
 setup(name='minitorch', version='1.0', packages=find_packages(), ext_modules=ext_modules)

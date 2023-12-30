@@ -1,9 +1,10 @@
 from __future__ import annotations
 from typing import Optional, Type
 from random import gauss, uniform
+import numpy as np
 import math
 
-from minitorch.buffer import MiniBuffer
+import cpp_backend as cpp
 from minitorch import helpers
 from minitorch.settings import DEBUG
 
@@ -36,25 +37,26 @@ class Tensor:
     __slots__ = ("data", "requires_grad", "grad", "_ctx")
     __deletable__ = ("_ctx",)
 
-    def __init__(self, data: float | int | list | MiniBuffer, requires_grad: bool = False):
-        if isinstance(data, MiniBuffer):
+    def __init__(self, data: float | int | list | cpp.MiniBuffer, requires_grad: bool = False):
+        if isinstance(data, cpp.MiniBuffer):
             self.data = data
         elif isinstance(data, float):
-            self.data = MiniBuffer([data], (1,))
+            self.data = cpp.MiniBuffer([data], (1,))
         elif isinstance(data, int):
-            self.data = MiniBuffer([float(data)], (1,))
+            self.data = cpp.MiniBuffer([float(data)], (1,))
         elif isinstance(data, list):
-            self.data = MiniBuffer.np_load(data)
+            self.data = Tensor._np_load(data)
         else:
-            assert False, f"Cannot construct Tensor3D with given data: {type(data)}. Expected: int | float | list(nested) | MiniBuffer."
+            assert False, f"Cannot construct Tensor with given data: {type(data)}. Expected: int | float | list(nested)."
+
         self.requires_grad = requires_grad
         self.grad: Optional[Tensor] = None
         # Internal variable used for autograd graph construction
         self._ctx: Optional[Function] = None
 
     @property
-    def shape(self) -> tuple[int, ...]:
-        return self.data.shape
+    def shape(self) -> list[int]:
+        return self.data.get_shape()
     
     @property
     def T(self) -> Tensor:
@@ -64,29 +66,29 @@ class Tensor:
     # TODO: Implement: one_hot
 
     @staticmethod
-    def fill(shape: tuple[int, ...], value: float, requires_grad: bool = False) -> Tensor:
-        return Tensor(MiniBuffer.fill(shape, value), requires_grad)
+    def fill(shape: list[int], value: float, requires_grad: bool = False) -> Tensor:
+        return Tensor(cpp.MiniBuffer.fill(shape, value), requires_grad)
 
     @staticmethod
-    def zeros(shape: tuple[int, ...], requires_grad: bool = False) -> Tensor:
+    def zeros(shape: list[int], requires_grad: bool = False) -> Tensor:
         return Tensor.fill(shape, 0.0, requires_grad)
 
     @staticmethod
-    def ones(shape: tuple[int, ...], requires_grad: bool = False) -> Tensor:
+    def ones(shape: list[int], requires_grad: bool = False) -> Tensor:
         return Tensor.fill(shape, 1.0, requires_grad)
 
     @staticmethod
     def arange(start: int, end: int, requires_grad: bool = False):
-        return Tensor([i for i in range(start, end)], requires_grad)
+        return Tensor(cpp.MiniBuffer.arange(start, end), requires_grad)
 
     @staticmethod
-    def randn(shape: tuple[int, ...], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
-        data = MiniBuffer([gauss(mean, std_dev) for _ in range(math.prod(shape))], shape)
+    def randn(shape: list[int], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
+        data = cpp.MiniBuffer([gauss(mean, std_dev) for _ in range(math.prod(shape))], shape)
         return Tensor(data, requires_grad)
 
     @staticmethod
-    def uniform(shape: tuple[int, ...], low: float, high: float, requires_grad: bool = False) -> Tensor:
-        data = data = MiniBuffer([uniform(low, high) for _ in range(math.prod(shape))], shape)
+    def uniform(shape: list[int], low: float, high: float, requires_grad: bool = False) -> Tensor:
+        data = cpp.MiniBuffer([uniform(low, high) for _ in range(math.prod(shape))], shape)
         return Tensor(data, requires_grad)
 
     @staticmethod
@@ -97,11 +99,11 @@ class Tensor:
         assert len(mask) == len(input.data), \
                f"Cannot mask {input.shape} Tensor with mask of length {len(mask)}"
         
-        return Tensor(MiniBuffer.masked_fill(input.data, mask, value), input.requires_grad)
+        return Tensor(cpp.MiniBuffer.masked_fill(input.data, mask, value), input.requires_grad)
 
     @staticmethod
     def replace(input: Tensor, target: float, new: float) -> Tensor:
-        return Tensor(MiniBuffer.replace(input.data, target, new), input.requires_grad)
+        return Tensor(cpp.MiniBuffer.replace(input.data, target, new), input.requires_grad)
 
     @staticmethod
     def tril(input: Tensor, diagonal: int = 0) -> Tensor:
@@ -109,7 +111,7 @@ class Tensor:
         assert diagonal >= -3 and diagonal < 3, \
             f"Cannot apply tril, invalid value provided for diagonal parameter: {diagonal}. Expected range [-3, 2]."
         
-        return Tensor(MiniBuffer.tril(input.data, diagonal), input.requires_grad)
+        return Tensor(cpp.MiniBuffer.tril(input.data, diagonal), input.requires_grad)
 
     @staticmethod
     def concat(axis: int, *inputs: Tensor) -> Tensor:
@@ -132,21 +134,21 @@ class Tensor:
     # The original had just the new shape and it applied the
     # Reshape operation on it. The current version was taken
     # from tinygrad because it is needed for matmul.
-    def reshape(self, new_shape: tuple[int, ...], *args) -> Tensor:
+    def reshape(self, new_shape: list[int], *args) -> Tensor:
         new_shape = helpers.argfix(new_shape, *args)
         assert 0 not in new_shape, \
             f"Zeros not allowed in shape ({new_shape})."
         assert math.prod(new_shape) == math.prod(self.shape), \
             f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(new_shape)} != {math.prod(self.shape)})."
         
-        return ops.Reshape.apply(self, new_shape=tuple([-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape]))
+        return ops.Reshape.apply(self, new_shape=[-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape])
     
     def flatten(self) -> Tensor:
         total_elements = math.prod(self.shape)
 
-        return ops.Reshape.apply(self, new_shape=(total_elements, ))
+        return ops.Reshape.apply(self, new_shape=[total_elements])
 
-    def permute(self, order: tuple[int, ...]) -> Tensor:
+    def permute(self, order: list[int]) -> Tensor:
         assert len(order) >= len(self.shape), \
                 f"Cannot permute Tensor. New shape dimensionality {len(order)} is smaller than original one {len(self.shape)}"
         
@@ -167,6 +169,7 @@ class Tensor:
 
         order = [i for i in range(len(x.shape))]
         order[axis0], order[axis1] = order[axis1], order[axis0]
+
         return ops.Permute.apply(x, order=order)
 
     #* Mutate methods
@@ -195,12 +198,12 @@ class Tensor:
 
         return ops.Shrink.apply(self, axis=axis, shrink_sizes=shrink_sizes)
     
-    def expand(self, new_shape: tuple[int, ...]) -> Tensor:
+    def expand(self, new_shape: list[int]) -> Tensor:
         if DEBUG:
-            assert isinstance(new_shape, tuple) and all(isinstance(dim, int) for dim in new_shape), \
+            assert isinstance(new_shape, list) and all(isinstance(dim, int) for dim in new_shape), \
                     f"Cannot expand, new shape expected type is tuple[int, ...] but got type{new_shape}."
         assert len(new_shape) >= len(self.shape), \
-            f"Cannot pad, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
+            f"Cannot expand, new shape dimensionality {new_shape} is smaller than original one {self.shape}."
             
         x = self
         shape_diff = len(new_shape) - len(x.shape)
@@ -208,10 +211,13 @@ class Tensor:
         if shape_diff > 0:
             x = Tensor.pad_shapes(shape_diff, x)
 
-        for dim_idx, (new_dim, current_dim) in enumerate(zip(new_shape, x.shape)):
-            if new_dim > current_dim:
-                assert current_dim == 1, "Cannot expand along a non-singular dimension."
-                x = ops.Expand.apply(x, axis=dim_idx, expanded_size=new_dim)
+        for dim_idx in range(len(x.shape)):
+            if x.shape[dim_idx] != new_shape[dim_idx]:
+                assert x.shape[dim_idx] == 1, \
+                    f"Cannot expand along ({dim_idx}) a non-singular axis ({x.shape[dim_idx]} != 1)."
+                
+                x = ops.Expand.apply(x,  axis=dim_idx, expanded_size=new_shape[dim_idx])
+
         
         return x
     
@@ -251,28 +257,32 @@ class Tensor:
     def sum(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         x = self
 
-        def _sum(input: Tensor, axis: int, keepdims: bool) -> Tensor:
-            if DEBUG:
-                assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
-            assert abs(axis) < len(input.shape), f"Cannot calculate sum, invalid axis provided. Tensor shape is {input.shape} but {axis}th dimension was provided."
-        
+        if DEBUG:
+            assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
+
+        def _sum(t: Tensor, axis: int, keepdims: bool = False) -> Tensor:
+            assert abs(axis) < len(self.shape), f"Cannot calculate sum, invalid axis provided. Tensor shape is {self.shape} but {axis}th dimension was provided."
+
             # Negative axes allowed
             if axis < 0:
-                axis = len(input.shape) + axis
+                axis = len(self.shape) + axis
 
-            shape_squeezed = [s for i,s in enumerate(input.shape) if i != axis]
-            sum_res = ops.Sum.apply(input, axis=axis)
-            
-            return sum_res if keepdims or axis is None else ops.Reshape.apply(sum_res, new_shape=tuple(shape_squeezed))
+            shape_squeezed = [s for i,s in enumerate(t.shape) if i != axis]
+            reuslt = ops.Sum.apply(t, axis=axis, keepdims=True)
+
+            return reuslt if keepdims or axis is None else ops.Reshape.apply(reuslt, new_shape=shape_squeezed)
         
         if axis is not None:
             return _sum(x, axis, keepdims)
         else:
             for axis_idx in range(len(self.shape)):
-                x = _sum(x, axis_idx, keepdims = True)
-            
-            return ops.Reshape.apply(x, new_shape=(1, ))
+                x = _sum(x, axis_idx, keepdims=True)
 
+            if keepdims:
+                return x
+            else:
+                return ops.Reshape.apply(x, new_shape=[1])
+        
     def mean(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         _sum = self.sum(axis, keepdims=keepdims)
 
@@ -421,7 +431,7 @@ class Tensor:
             
             for parent, grad in zip(node._ctx.parents, grads):
                 if grad is not None and parent.requires_grad:
-                    assert grad.shape == parent.shape, f"Grad shape must match Tensor shape, {grad.shape} != {parent.shape}"
+                    assert grad.shape == parent.shape, f"Grad shape must match Tensor shape, {grad.shape} != {parent.shape} ({node._ctx})"
                     parent.grad = grad if parent.grad is None else (parent.grad + grad)
             
             del node._ctx
@@ -437,10 +447,10 @@ class Tensor:
         shape_delta = len(xshape) - len(yshape)
 
         if shape_delta > 0:
-            new_shape = (1,) * shape_delta + yshape 
+            new_shape = [1] * shape_delta + yshape 
             y = y.reshape(new_shape)
         elif shape_delta < 0:
-            new_shape = (1,) * -shape_delta + xshape 
+            new_shape = [1] * -shape_delta + xshape 
             x = x.reshape(new_shape)
 
         if (xshape:=x.shape) == (yshape:=y.shape): 
@@ -573,11 +583,11 @@ class Tensor:
         if isinstance(other, Tensor):
             assert self.shape == other.shape, f"Cannot compare {self.shape} and {other.shape} Tensors. Shapes must match."
 
-            return self.data.is_equal_to(other.data)
+            return self.data == other.data
         elif isinstance(other, (int, float)):
             if isinstance(other, int): other = float(other)
 
-            return self.data.is_elementwise_equal_to(other)
+            return self.data == other
         else:
             assert False, f"Invalid type for Tensor equality: {type(other)}. Expected Tensor, int or float."
 
@@ -587,7 +597,7 @@ class Tensor:
         if isinstance(other, int): 
             other = float(other)
 
-        return self.data.is_elementwise_less_than(other)
+        return self.data < other
     
     def __gt__(self, other) -> list[bool]:
         if DEBUG:
@@ -595,7 +605,7 @@ class Tensor:
         if isinstance(other, int): 
             other = float(other)
 
-        return self.data.is_elementwise_greater_than(other)
+        return self.data > other
 
     def __hash__(self) -> int:
         return id(self)
@@ -628,6 +638,16 @@ class Tensor:
         return Tensor(self.data)
 
     #* Utility
+    
+    @staticmethod
+    def _np_load(data: list) -> cpp.MiniBuffer:
+        _np = np.array(data)
+        shape = []
+
+        for dim in _np.shape:
+            shape.append(dim)
+        
+        return cpp.MiniBuffer(_np.reshape(-1).astype(np.float32).tolist(), shape)
 
     #? NOTE: Mirko, 25. 12. 2023
     # Some reshape operations require the Tensors shape
