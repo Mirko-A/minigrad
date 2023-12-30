@@ -47,7 +47,11 @@ class Tensor:
         elif isinstance(data, list):
             self.data = Tensor._np_load(data)
         else:
-            assert False, f"Cannot construct Tensor with given data: {type(data)}. Expected: int | float | list(nested)."
+            assert False, \
+                f"Cannot construct Tensor with given data: {type(data)}. Expected: int | float | list(nested)."
+
+        assert self.data.get_rank() <= 4, \
+            f"Cannot construct Tensor of rank {self.data.get_rank()}. Maximum supported rank is 4."
 
         self.requires_grad = requires_grad
         self.grad: Optional[Tensor] = None
@@ -58,6 +62,10 @@ class Tensor:
     def shape(self) -> list[int]:
         return self.data.get_shape()
     
+    @property
+    def rank(self) -> int:
+        return self.data.get_rank()
+
     @property
     def T(self) -> Tensor:
         return self.transpose()
@@ -174,16 +182,16 @@ class Tensor:
 
     #* Mutate methods
     
-    def pad(self, axis: int, pad_sizes: tuple[int, int], pad_type: MiniBuffer.PadType = MiniBuffer.PadType.ZERO) -> Tensor:
-        if DEBUG:
-            assert isinstance(pad_sizes, tuple) and all(isinstance(size, int) for size in pad_sizes), \
-                    f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{pad_sizes}."
+    # def pad(self, axis: int, pad_sizes: tuple[int, int], pad_type: MiniBuffer.PadType = MiniBuffer.PadType.ZERO) -> Tensor:
+    #     if DEBUG:
+    #         assert isinstance(pad_sizes, tuple) and all(isinstance(size, int) for size in pad_sizes), \
+    #                 f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{pad_sizes}."
 
-        # Negative axes allowed
-        if axis < 0:
-            axis = len(self.shape) + axis
+    #     # Negative axes allowed
+    #     if axis < 0:
+    #         axis = len(self.shape) + axis
         
-        return ops.Pad.apply(self, axis=axis, pad_sizes=pad_sizes, pad_type=pad_type)
+    #     return ops.Pad.apply(self, axis=axis, pad_sizes=pad_sizes, pad_type=pad_type)
 
     def shrink(self, axis: int, shrink_sizes: tuple[int, int]) -> Tensor:
         if DEBUG:
@@ -656,7 +664,7 @@ class Tensor:
     # on the left (e.g. [m, n] -> [1, m, n]).
     @staticmethod
     def pad_shapes(shape_diff: int, x: Tensor) -> Tensor:
-        padded_shape = (1,) * shape_diff + x.shape
+        padded_shape = [1] * shape_diff + x.shape
         return ops.Reshape.apply(x, new_shape=padded_shape)
 
     #? NOTE: Mirko, 25. 12. 2023

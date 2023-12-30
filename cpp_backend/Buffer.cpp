@@ -249,7 +249,7 @@ namespace minitorch
             }
             break;
             default:
-                assert(false & "Cannot tril MiniBuffer, invalid rank provided.");
+                assert(false && "Cannot tril MiniBuffer, invalid rank provided.");
                 // Only for compiler warnings, will not reach
                 return input;
                 break;
@@ -261,7 +261,7 @@ namespace minitorch
         std::vector<float> result;
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(-this->m_Data[i]);
         }
@@ -275,7 +275,7 @@ namespace minitorch
         std::vector<float> result;
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(std::log(this->m_Data[i]));
         }
@@ -288,7 +288,7 @@ namespace minitorch
         std::vector<float> result;
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(std::log2(this->m_Data[i]));
         }
@@ -302,12 +302,12 @@ namespace minitorch
 
         if (this->m_Shape != other.m_Shape)
         {
-            assert(false & "Cannot perform addition, shapes do not match.");
+            assert(false && "Cannot perform addition, shapes do not match.");
         }
 
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(this->m_Data[i] + other.m_Data[i]);
         }
@@ -321,12 +321,12 @@ namespace minitorch
 
         if (this->m_Shape != other.m_Shape)
         {
-            assert(false & "Cannot perform addition, shapes do not match.");
+            assert(false && "Cannot perform addition, shapes do not match.");
         }
 
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(this->m_Data[i] - other.m_Data[i]);
         }
@@ -340,12 +340,12 @@ namespace minitorch
 
         if (this->m_Shape != other.m_Shape)
         {
-            assert(false & "Cannot perform addition, shapes do not match.");
+            assert(false && "Cannot perform addition, shapes do not match.");
         }
 
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(this->m_Data[i] * other.m_Data[i]);
         }
@@ -359,12 +359,12 @@ namespace minitorch
 
         if (this->m_Shape != other.m_Shape)
         {
-            assert(false & "Cannot perform addition, shapes do not match.");
+            assert(false && "Cannot perform addition, shapes do not match.");
         }
 
         result.reserve(this->m_Data.size());
 
-        for (size_t i = 0; i < this->m_Data.size(); i++)
+        for (int i = 0; i < this->m_Data.size(); i++)
         {
             result.push_back(this->m_Data[i] / other.m_Data[i]);
         }
@@ -591,7 +591,7 @@ namespace minitorch
             }
             break;
             default:
-                assert(false & "Cannot sum MiniBuffer, invalid rank provided.");
+                assert(false && "Cannot sum MiniBuffer, invalid rank provided.");
                 break;
         }
         
@@ -905,7 +905,7 @@ namespace minitorch
             }
             break;
             default:
-                assert(false & "Cannot pad MiniBuffer, invalid rank provided.");
+                assert(false && "Cannot pad MiniBuffer, invalid rank provided.");
                 // Only for compiler warnings, will not reach
                 return *this;
                 break;
@@ -1063,7 +1063,7 @@ namespace minitorch
             }
             break;
             default:
-                assert(false & "Cannot shrink MiniBuffer, invalid rank provided.");
+                assert(false && "Cannot shrink MiniBuffer, invalid rank provided.");
                 // Only for compiler warnings, will not reach
                 return *this;
                 break;
@@ -1172,7 +1172,7 @@ namespace minitorch
             }
             break;
             default:
-                assert(false & "Cannot create a contiguous MiniBuffer, invalid rank provided.");
+                assert(false && "Cannot create a contiguous MiniBuffer, invalid rank provided.");
                 // Only for compiler warnings, will not reach
                 return *this;
                 break;
@@ -1245,7 +1245,7 @@ namespace minitorch
             }
             break;
             default:
-                assert(false & "Cannot convert MiniBuffer to string, invalid rank provided.");
+                assert(false && "Cannot convert MiniBuffer to string, invalid rank provided.");
                 break;
         }
 
