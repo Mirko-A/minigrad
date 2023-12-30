@@ -16,17 +16,23 @@ import numpy as np
 
 # 1 1 1
 
-def main1():
-    t = Tensor.arange(0, 3 * 3, True).reshape((3, 3))
-    t = t.pad(0, [1, 1])
-    print(t)
-    mask = t == 0.0
-    print(mask)
-
-    t = Tensor.masked_fill(t, mask, 1.3)
-    print(t)
-
 def main():
+    start = time.time()
+
+    t1 = Tensor.arange(0, 2*64*64, True).reshape([2, 64, 64])
+    t1 = t1 / 1000
+    t2 = Tensor.arange(0, 2*64*64, True).reshape([2, 64, 64])
+    t2 = t2 / 1000
+    #print(t)
+    #t2 = Tensor.arange(0, 16).reshape([2, 2, 2, 2])
+
+    for _ in range(100):
+        y = t1 @ t2
+
+    print(y)
+    print(f"Time: {time.time() - start}")
+
+def main1():
     prki_net = Sequence(
         Linear(2, 4),
         Linear(4, 2),
