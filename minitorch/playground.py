@@ -3,7 +3,6 @@ from minitorch.nn.module import Sequence
 from minitorch.nn.optim import Adam
 from minitorch.nn.module import Sigmoid, Relu, Tanh, MSELoss, CrossEntropyLoss
 from minitorch.tensor import Tensor
-from minitorch import buffer
 
 import time
 
