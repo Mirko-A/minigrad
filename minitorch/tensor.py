@@ -4,7 +4,7 @@ from random import gauss, uniform
 import numpy as np
 import math
 
-import minitorch.backend as cpp
+import Backend as cpp
 from minitorch import helpers
 from minitorch.settings import DEBUG
 
@@ -182,16 +182,16 @@ class Tensor:
 
     #* Mutate methods
     
-    # def pad(self, axis: int, pad_sizes: tuple[int, int], pad_type: MiniBuffer.PadType = MiniBuffer.PadType.ZERO) -> Tensor:
-    #     if DEBUG:
-    #         assert isinstance(pad_sizes, tuple) and all(isinstance(size, int) for size in pad_sizes), \
-    #                 f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{pad_sizes}."
+    def pad(self, axis: int, pad_sizes: tuple[int, int]) -> Tensor:
+        if DEBUG:
+            assert isinstance(pad_sizes, tuple) and all(isinstance(size, int) for size in pad_sizes), \
+                    f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{pad_sizes}."
 
-    #     # Negative axes allowed
-    #     if axis < 0:
-    #         axis = len(self.shape) + axis
+        # Negative axes allowed
+        if axis < 0:
+            axis = len(self.shape) + axis
         
-    #     return ops.Pad.apply(self, axis=axis, pad_sizes=pad_sizes, pad_type=pad_type)
+        return ops.Pad.apply(self, axis=axis, pad_sizes=pad_sizes)
 
     def shrink(self, axis: int, shrink_sizes: tuple[int, int]) -> Tensor:
         if DEBUG:

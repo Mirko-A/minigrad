@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 import math
 
-import minitorch.backend as cpp
+import Backend as cpp
 from minitorch.tensor import Function
 from minitorch import helpers
 
@@ -131,11 +131,11 @@ class Reshape(Function):
 #* Mutate operations
 
 class Pad(Function):
-    def forward(self, x: cpp.MiniBuffer, axis: int, pad_sizes: tuple[int, int], pad_type: cpp.MiniBuffer.PadType) -> cpp.MiniBuffer:
+    def forward(self, x: cpp.MiniBuffer, axis: int, pad_sizes: tuple[int, int]) -> cpp.MiniBuffer:
         self.pad_axis = axis
         self.pad_sizes = pad_sizes
 
-        return x.pad(axis, pad_sizes, pad_type)
+        return x.pad(axis, pad_sizes)
 
     # TODO: Mirko, 24. 12. 2023 
     # It makes sense that shrink is opposite of pad but this
