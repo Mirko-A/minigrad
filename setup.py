@@ -4,8 +4,9 @@ from pybind11.setup_helpers import Pybind11Extension
 
 ext_modules = [
     Pybind11Extension(
-        "cpp_backend",
-        sorted(glob("cpp_backend/*.cpp")),
+        "Backend",
+        sorted(glob("minitorch/backend/*.cpp")),
+        sorted(glob("minitorch/backend/*.h")),
         extra_compile_args=["/DEBUG"]
     )
 ]

@@ -97,7 +97,7 @@ namespace minitorch
         return result_data;
     }
     
-    PYBIND11_MODULE(cpp_backend, m)
+    PYBIND11_MODULE(Backend, m)
     {
         m.doc() = "C++ backend for the minitorch library.";
     

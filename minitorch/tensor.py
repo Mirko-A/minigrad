@@ -4,7 +4,7 @@ from random import gauss, uniform
 import numpy as np
 import math
 
-import cpp_backend as cpp
+import minitorch.backend as cpp
 from minitorch import helpers
 from minitorch.settings import DEBUG
 

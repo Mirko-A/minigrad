@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional
 import math
 
-import cpp_backend as cpp
+import minitorch.backend as cpp
 from minitorch.tensor import Function
 from minitorch import helpers
 
