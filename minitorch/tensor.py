@@ -136,20 +136,18 @@ class Tensor:
 
     #* Movement methods
     
-    #? NOTE: Mirko, 24. 12. 2023  
-    # How exactly this version of reshape (with *args) works
-    # isn't super clear, it was simply stolen from tinygrad. 
-    # The original had just the new shape and it applied the
-    # Reshape operation on it. The current version was taken
-    # from tinygrad because it is needed for matmul.
-    def reshape(self, new_shape: list[int], *args) -> Tensor:
+    #? NOTE: Mirko, 1. 1. 2024.
+    # This function accepts a new shape as a list[int] but can
+    # optionally accept any number of additional integers and
+    # those will be appended to the new shape.
+    def reshape(self, new_shape: list[int], *args: int) -> Tensor:
         new_shape = helpers.argfix(new_shape, *args)
         assert 0 not in new_shape, \
             f"Zeros not allowed in shape ({new_shape})."
         assert math.prod(new_shape) == math.prod(self.shape), \
             f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(new_shape)} != {math.prod(self.shape)})."
         
-        return ops.Reshape.apply(self, new_shape=[-math.prod(self.shape) // math.prod(new_shape) if s == -1 else s for s in new_shape])
+        return ops.Reshape.apply(self, new_shape=[s for s in new_shape])
     
     def flatten(self) -> Tensor:
         total_elements = math.prod(self.shape)
@@ -357,17 +355,18 @@ class Tensor:
             f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-2]})"
         
         #? NOTE: Mirko, 24. 12. 2023 
-        # This last part isn't super clear, it was simply
-        # stolen from tinygrad. But my guess is that it is an
-        # n-dimensional analogy to the way you can perfom matrix
-        # multiplication between A[m, n] and B[n, p] by performing
-        # the following operations:
-        # 1) A = reshape(A, (1, m, n))
-        # 2) B = reshape(B, (n, p, 1))
-        # 3) B = transpose(B)
-        # 4) C = (A*B).sum(-1)
-        x = self.reshape(*self.shape[0:-1], *[1]*min(n1-1, n2-1, 1), self.shape[-1])
-        y = y.reshape(*y.shape[0:-2], *[1]*min(n1-1, n2-1, 1), *y.shape[-2:]).transpose()
+        # Example to ilustrate what is happening below:
+        # let x.shape = [3, 3]  &  y.shape = [3, 2]
+        # x.shape = [3, 1, 3]
+        # y.shape = [1, 3, 2]^T = [1, 2, 3]
+        # Broadcasted: 
+        # x.shape = [3, 2, 3]
+        # y.shape = [3, 2, 3]
+        # Performing element-wise product and then sum over the last
+        # dimension (rows) is essentially giving the same result as
+        # matrix multiplication.
+        x = self.reshape(*self.shape[0:-1], 1, self.shape[-1])
+        y = y.reshape(*y.shape[0:-2], 1, *y.shape[-2:]).transpose()
 
         return (x*y).sum(-1)
 

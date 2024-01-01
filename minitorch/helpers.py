@@ -5,7 +5,7 @@ def argsort(x: tuple[int, ...]):
     return type(x)(sorted(range(len(x)), key=x.__getitem__))
 
 def argfix(*x): 
-    return tuple(x[0]) if x and x[0].__class__ in (tuple, list) else x
+    return list(x[0]) if x and x[0].__class__ in (tuple, list) else x
 
 def float_equal(x: float, y: float) -> bool:
     assert isinstance(x, float) and isinstance(y, float), \

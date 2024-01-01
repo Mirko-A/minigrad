@@ -41,7 +41,7 @@ class Sum(Function):
         self.sum_axis = axis
         self.sum_axis_size = x.get_shape()[axis]
 
-        return x.sum(axis, True)
+        return x.sum(axis)
 
     def backward(self, chain_grad: cpp.MiniBuffer) -> cpp.MiniBuffer:
         return chain_grad.expand(self.sum_axis, self.sum_axis_size)
@@ -163,7 +163,7 @@ class Expand(Function):
         return x.expand(axis, expanded_size)
 
     def backward(self, chain_grad: cpp.MiniBuffer) -> cpp.MiniBuffer:
-        return chain_grad.sum(self.reduce_axis, True)
+        return chain_grad.sum(self.reduce_axis)
     
 #* Activation functions
 

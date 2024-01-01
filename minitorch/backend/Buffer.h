@@ -42,8 +42,8 @@ namespace minitorch
         std::vector<bool> operator>(float other) const;
 
         // Reduce operations
-        MiniBuffer sum(bool keepdims);
-        MiniBuffer sum(int axis, bool keepdims);
+        MiniBuffer sum();
+        MiniBuffer sum(int axis);
 
         // Mutate operations
         MiniBuffer reshape(const std::vector<int> new_shape) const;

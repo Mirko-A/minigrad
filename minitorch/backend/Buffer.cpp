@@ -546,22 +546,17 @@ namespace minitorch
         return MiniBuffer(data, output_shape);
     }
 
-    MiniBuffer MiniBuffer::sum(bool keepdims)
+    MiniBuffer MiniBuffer::sum()
     {
         const auto& input_data = this->m_Data;
+        std::vector<int> new_shape(this->m_Rank, 1);
 
         float sum = std::accumulate(input_data.begin(), input_data.end(), 0.0F);
-        std::vector<int> new_shape{1};
-
-        if (keepdims)
-        {
-            new_shape = std::vector<int>(this->m_Rank, 1);
-        }
 
         return MiniBuffer(std::vector<float>{sum}, new_shape);
     }
 
-    MiniBuffer MiniBuffer::sum(int axis, bool keepdims)
+    MiniBuffer MiniBuffer::sum(int axis)
     {
         size_t rank = this->m_Rank;
 
@@ -595,26 +590,7 @@ namespace minitorch
                 break;
         }
         
-        x = x.swap_nth_axis_with_last(axis);
-
-        if (keepdims)
-        {
-            return x;
-        }
-        else
-        {
-            std::vector<int> new_shape{};
-
-            for (int dim : x.m_Shape)
-            {
-                if (dim != 1)
-                {
-                    new_shape.push_back(dim);
-                }
-            }
-
-            return MiniBuffer(x.m_Data, new_shape);
-        }
+        return x.swap_nth_axis_with_last(axis);
     }
 
     MiniBuffer MiniBuffer::reshape(const std::vector<int> new_shape) const

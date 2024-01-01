@@ -132,8 +132,8 @@ namespace minitorch
                 .def(pybind11::self <  float())
                 .def(pybind11::self >  float())
                 // Reduction
-                .def("sum", static_cast<MiniBuffer (MiniBuffer::*)(bool)>(&MiniBuffer::sum))
-                .def("sum", static_cast<MiniBuffer (MiniBuffer::*)(int, bool)>(&MiniBuffer::sum))
+                .def("sum", static_cast<MiniBuffer (MiniBuffer::*)()>(&MiniBuffer::sum))
+                .def("sum", static_cast<MiniBuffer (MiniBuffer::*)(int)>(&MiniBuffer::sum))
                 // Mutation
                 .def("reshape", &MiniBuffer::reshape)
                 .def("flatten", &MiniBuffer::flatten)
