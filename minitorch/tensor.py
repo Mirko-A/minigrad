@@ -41,9 +41,9 @@ class Tensor:
         if isinstance(data, cpp.MiniBuffer):
             self.data = data
         elif isinstance(data, float):
-            self.data = cpp.MiniBuffer([data], (1,))
+            self.data = cpp.MiniBuffer([data], [1])
         elif isinstance(data, int):
-            self.data = cpp.MiniBuffer([float(data)], (1,))
+            self.data = cpp.MiniBuffer([float(data)], [1])
         elif isinstance(data, list):
             self.data = Tensor._np_load(data)
         else:
@@ -463,7 +463,7 @@ class Tensor:
         if (xshape:=x.shape) == (yshape:=y.shape): 
             return (x, y)
     
-        shape_ret = tuple([max(x, y) for x, y in zip(xshape, yshape)])
+        shape_ret = [max(x, y) for x, y in zip(xshape, yshape)]
 
         if xshape != shape_ret: 
             x = x.expand(shape_ret)

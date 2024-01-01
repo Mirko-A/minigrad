@@ -7,7 +7,6 @@ ext_modules = [
         "Backend",
         sorted(glob("minitorch/backend/*.cpp")),
         sorted(glob("minitorch/backend/*.h")),
-        extra_compile_args=["/DEBUG"]
     )
 ]
 

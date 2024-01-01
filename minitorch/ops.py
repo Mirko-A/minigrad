@@ -154,34 +154,35 @@ class Shrink(Function):
     # It makes sense that pad is opposite of shrink but this
     # has not been checked!
     def backward(self, chain_grad: cpp.MiniBuffer) -> cpp.MiniBuffer:
-        return chain_grad.pad(self.shrink_axis, self.shrink_sizes, cpp.MiniBuffer.PadType.ZERO)
+        return chain_grad.pad(self.shrink_axis, self.shrink_sizes)
 
 class Expand(Function):
-    def forward(self, x: cpp.MiniBuffer, axis: int, expanded_size: int) -> cpp.MiniBuffer:
+    def forward(self, x: MiniBuffer, axis: int, expanded_size: int) -> MiniBuffer:
         self.reduce_axis = axis
 
         return x.expand(axis, expanded_size)
 
-    def backward(self, chain_grad: cpp.MiniBuffer) -> cpp.MiniBuffer:
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
         return chain_grad.sum(self.reduce_axis)
     
 #* Activation functions
 
 class Sigmoid(Function):
-    def forward(self, x: cpp.MiniBuffer) -> cpp.MiniBuffer:
-        self.result = cpp.MiniBuffer.full_like(x, 1) / (cpp.MiniBuffer.full_like(x, 1) + cpp.MiniBuffer.full_like(x, math.e).pow(-x))
+    def forward(self, x: MiniBuffer) -> MiniBuffer:
+        self.result = MiniBuffer.full_like(x, 1) / (MiniBuffer.full_like(x, 1) + MiniBuffer.full_like(x, math.e).pow(-x))
 
         return self.result
 
-    def backward(self, chain_grad: cpp.MiniBuffer) -> cpp.MiniBuffer:
-        return chain_grad * (self.result * (cpp.MiniBuffer.full_like(self.result, 1.0) - self.result))
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad * (self.result * (MiniBuffer.full_like(self.result, 1.0) - self.result))
 
 class Relu(Function):
-    def forward(self, x: cpp.MiniBuffer) -> cpp.MiniBuffer:
-        self.result = x.max(cpp.MiniBuffer.full_like(x, 0.0))
+    def forward(self, x: MiniBuffer) -> MiniBuffer:
+        self.result = x.max(MiniBuffer.full_like(x, 0.0))
         return self.result
 
-    def backward(self, chain_grad: cpp.MiniBuffer) -> cpp.MiniBuffer:
-        return chain_grad * cpp.MiniBuffer.masked_fill(cpp.MiniBuffer.full_like(self.result, 0.0),
+    def backward(self, chain_grad: MiniBuffer) -> MiniBuffer:
+        return chain_grad * MiniBuffer.masked_fill(MiniBuffer.full_like(self.result, 0.0),
                                                        self.result > 0,
                                                        1.0)
+
