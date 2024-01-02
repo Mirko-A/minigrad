@@ -60,8 +60,9 @@ t6 = Tensor.concat(0, t4, t5) # Concatenate the provided Tensors along axis 0. T
 
 # *in a triangular matrix, all values above the diagonal are set to 0
 
+# NOTE:
 # All of the methods which create Tensor objects have an additional boolean parameter
-# 'requires_grad'. This parameter determines whether a computation grad will be created
+# 'requires_grad'. This parameter determines whether a computation graph will be created
 # from mathematical operations performed on those Tensors. In case the 'requires_grad'
 # parameter is set to True, the graph will be created and can be later used to calculate
 # the gradients of all Tensors which participate in the mathematical operations by calling
