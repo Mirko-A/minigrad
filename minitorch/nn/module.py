@@ -4,14 +4,18 @@ import math
 
 from minitorch.tensor import Tensor
 
+# Base class for all NN modules
+
 class Module(ABC):
     @abstractmethod
-    def forward(self, input: Tensor) -> Tensor:
+    def forward(self, input) -> Tensor:
         ...
 
     @abstractmethod
     def params(self) -> Optional[list[Tensor]]:
         ...
+
+# Simple linear module (y = ax + b)
 
 class Linear(Module):
     def __init__(self, in_features: int, out_features: int, need_bias: bool = True) -> None:
@@ -42,6 +46,8 @@ class Linear(Module):
     
     def __call__(self, input: Tensor) -> Tensor:
         return self.forward(input)
+
+# Activation function modules
 
 class Sigmoid(Module):
     def forward(self, input: Tensor) -> Tensor:
@@ -86,6 +92,8 @@ class Softmax(Module):
     def __call__(self, input: Tensor) -> Tensor:
         return self.forward(input)
 
+# Loss function modules
+
 class MSELoss(Module):
     def __init__(self, axis: Optional[int] = None) -> None:
         self.axis = axis
@@ -112,6 +120,25 @@ class CrossEntropyLoss(Module):
     def __call__(self, input: Tensor, target: Tensor) -> Tensor:
         return self.forward(input, target)
 
+# Embedding module (lookup table)
+
+class Embedding(Module):
+    def __init__(self, n_embeddings: int, embedding_dim: int):
+        self.n_embeddings = n_embeddings
+        self.embedding_dim = embedding_dim
+        self.embeddings = [Tensor.randn([1, embedding_dim]) for _ in range(n_embeddings)]
+
+    def forward(self, input: int) -> Tensor:
+        return self.embeddings[input]
+    
+    def params(self) -> list[Tensor]:
+        return self.embeddings
+    
+    def __call__(self, input: int) -> Tensor:
+        return self.forward(input)
+
+# Sequence module. Used to create chains of basic modules
+
 class Sequence(Module):
     def __init__(self, *modules: Module) -> None:
         self.modules = modules
@@ -126,7 +153,7 @@ class Sequence(Module):
         
         return next_input
     
-    def params(self) -> Tensor:
+    def params(self) -> list[Tensor]:
         return self._params
         
     def _get_module_params(self) -> list[Tensor]:
