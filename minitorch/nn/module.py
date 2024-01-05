@@ -25,8 +25,8 @@ class Linear(Module):
         self.in_features = in_features
         self.out_features = out_features
         self.need_bias = need_bias
-        self.weights = Tensor.uniform((in_features, out_features), -sqrt_k, sqrt_k)
-        self.bias = Tensor.uniform((1, out_features), -sqrt_k, sqrt_k) if need_bias else None
+        self.weights = Tensor.uniform([in_features, out_features], -sqrt_k, sqrt_k)
+        self.bias = Tensor.uniform([1, out_features], -sqrt_k, sqrt_k) if need_bias else None
 
     def forward(self, input: Tensor) -> Tensor:
         output = input @ self.weights

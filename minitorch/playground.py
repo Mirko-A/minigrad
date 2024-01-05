@@ -15,7 +15,7 @@ import numpy as np
 
 # 1 1 1
 
-def main():
+def main1():
     start = time.time()
 
     t1 = Tensor.arange(0, 2*64*64, True).reshape([2, 64, 64])
@@ -31,21 +31,24 @@ def main():
     print(y)
     print(f"Time: {time.time() - start}")
 
-def main1():
+def main0():
+    t = Tensor.arange(0, 3 * 3, True).reshape((3, 3))
+    print(t)
+    x = t.sum(0)
+    print(x)
+
+def main():
     prki_net = Sequence(
-        Linear(2, 4),
-        Linear(4, 2),
-        Linear(2, 2),
+        Linear(128, 128),
+        Linear(128, 64),
+        Linear(64, 1),
         Sigmoid()
     )
     loss = MSELoss()
 
     adam = Adam(prki_net.params(), 0.05)
 
-    input = Tensor([[0, 0],
-                    [1, 0],
-                    [0, 1],
-                    [1, 1]])
+    input = Tensor.randn([4, 128])
     target = Tensor([[0], 
                      [1], 
                      [1],
@@ -60,12 +63,12 @@ def main1():
 
         l = loss(pred, target)
         l.backward()
-        print(f"Loss: {l}")
+        #print(f"Loss: {l}")
 
         adam.step()
 
-    
     print(pred)
+    print(l)
 
     print(f"Total time (new code): {time.time() - start}")
 

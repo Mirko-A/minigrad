@@ -1,15 +1,16 @@
 # minitorch
 
-Minitorch is a small-scale attempt to replicate a subset of the PyTorch framework. It is (being) developed for educational purposes. It is written in Python and the current version uses no third-party libraries whatsoever.
+Minitorch is a small-scale attempt to replicate a subset of the PyTorch framework. It is (being) developed for educational purposes. It is written in Python (the frontend API) and C++ (the backend). The current version uses no third-party libraries whatsoever.
 
 ### Repository structure
 
 | Component            | Description                       |
 | -------------------- | ----------------------------------|
 | minitorch.tensor     | Tensor library                    |
+| minitorch.backend    | C++ backend                       |
 | minitorch.nn.module  | Neural network library            |
 | minitorch.nn.optim   | Optimizer modules                 |
-| examples             | Examples of how to use Minitorch  |
+| examples             | Examples of how to use minitorch  |
 
 ### Project setup
 
@@ -20,7 +21,7 @@ Minitorch is a small-scale attempt to replicate a subset of the PyTorch framewor
 
 ### Examples
 
-Here are a few examples of how one would use Minitorch. For more detailed ones, check out the *examples* directory.
+Here are a few examples of how one would use minitorch. For more detailed ones, check out the *examples* directory.
 
 ##### Working with Tensors
 
@@ -32,10 +33,10 @@ t0 = Tensor([[[0, 1, 2],   # Creates a 2x2x3 Tensor.
              [[0, 1, 2],
               [3, 4, 5]]])
 
-t1 = Tensor.fill((2, 2, 3), 0.5)   # Creates a 2x2x3 Tensor 
+t1 = Tensor.fill([2, 2, 3], 0.5)   # Creates a 2x2x3 Tensor 
                                    # filled with 0.5.
 
-t2 = Tensor.randn((2, 3, 2), 0.0, 2.0)  # Creates a 2x3x2 Tensor filled with
+t2 = Tensor.randn([2, 3, 2], 0.0, 2.0)  # Creates a 2x3x2 Tensor filled with
                                         # filled with random values where 
                                         # mean = 0.0, std_dev = 2.0 (optional)
 
