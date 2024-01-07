@@ -297,6 +297,20 @@ class Tensor:
         else:
             return _sum / math.prod(self.shape)
 
+    def std(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
+        # Number of samples
+        N = math.prod(self.shape) if axis is None else self.shape[axis]
+        # Bessel's correction (taking into account the case where N = 1)
+        N = max(1, N - 1)
+
+        _mean = self.mean(axis, True)
+        deviation = ((self - _mean) ** 2)
+        
+        return (deviation.sum(axis) / N).sqrt()
+
+    def var(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
+        return self.std(axis, keepdims) ** 2
+
     #* Binary operations
 
     def add(self, other: Tensor, reverse: bool = False) -> Tensor:
