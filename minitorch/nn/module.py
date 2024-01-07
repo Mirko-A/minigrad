@@ -120,6 +120,26 @@ class CrossEntropyLoss(Module):
     def __call__(self, input: Tensor, target: Tensor) -> Tensor:
         return self.forward(input, target)
 
+# Normalization modules
+
+class LayerNorm(Module):
+    def __init__(self, dim, eps = 1e-5):
+        self.eps = eps
+        self.gamma = Tensor.ones(dim)
+        self.beta = Tensor.zeros(dim)
+
+    def forward(self, input: Tensor) -> Tensor:
+        mean = input.mean(-1, keepdims=True)
+        var = input.var(-1, keepdims=True)
+
+        return ((input - mean) / (var + self.eps).sqrt()) * self.gamma + self.beta
+
+    def params(self) -> list[Tensor]:
+        return [self.gamma, self.beta]
+
+    def __call__(self, input: Tensor) -> Tensor:
+        return self.forward(input)
+
 # Embedding module (lookup table)
 
 class Embedding(Module):

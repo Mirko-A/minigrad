@@ -306,7 +306,7 @@ class Tensor:
         _mean = self.mean(axis, True)
         deviation = ((self - _mean) ** 2)
         
-        return (deviation.sum(axis) / N).sqrt()
+        return (deviation.sum(axis, keepdims) / N).sqrt()
 
     def var(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         return self.std(axis, keepdims) ** 2
