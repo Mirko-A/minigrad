@@ -155,14 +155,39 @@ class Embedding(Module):
         self.embedding_dim = embedding_dim
         self.embeddings = [Tensor.randn([1, embedding_dim]) for _ in range(n_embeddings)]
 
-    def forward(self, input: int) -> Tensor:
-        return self.embeddings[input]
+    def forward(self, input: list[int]) -> Tensor:
+        embeddings = [self.embeddings[i] for i in input]
+
+        return Tensor.concat(0, *embeddings).reshape([len(input), self.embedding_dim])
     
     def params(self) -> list[Tensor]:
         return self.embeddings
     
-    def __call__(self, input: int) -> Tensor:
+    def __call__(self, input: list[int]) -> Tensor:
         return self.forward(input)
+ 
+class PositionalEncoding(Module):
+    def __init__(self, d_model: int, N: int = 10_000):
+        self.d_model = d_model
+        self.N = N
+
+    def forward(self, input: list[int]) -> Tensor:
+        L = len(input)
+        encodings = []
+
+        for k in range(L):
+            for i in range(self.d_model // 2):
+                encodings.append(math.sin(k / (self.N ** ((2 * i) / self.d_model))))
+                encodings.append(math.cos(k / (self.N ** ((2 * i) / self.d_model))))
+        
+        return Tensor(encodings).reshape([L, self.d_model])
+    
+    def params(self) -> None:
+        return None
+    
+    def __call__(self, input: list[int]) -> Tensor:
+        return self.forward(input)
+
 
 # Self-attention modules
  
