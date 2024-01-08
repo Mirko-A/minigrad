@@ -119,6 +119,9 @@ class CrossEntropyLoss(Module):
 
     def __call__(self, input: Tensor, target: Tensor) -> Tensor:
         return self.forward(input, target)
+    
+class LayerNorm(Module):
+    ...
 
 # Embedding module (lookup table)
 
@@ -136,6 +139,84 @@ class Embedding(Module):
     
     def __call__(self, input: int) -> Tensor:
         return self.forward(input)
+
+# Self-attention modules
+ 
+class AttentionHead(Module):
+    def __init__(self, embedding_dim: int, head_size: int, context_len: int):
+        self.query = Linear(embedding_dim, head_size, need_bias=False)
+        self.key = Linear(embedding_dim, head_size, need_bias=False)
+        self.value = Linear(embedding_dim, head_size, need_bias=False)
+        self.tril = Tensor.tril(Tensor.ones([context_len, context_len]))
+        
+    def forward(self, input: Tensor) -> Tensor:
+        def correct_tril_shape(B, T):
+            tril = self.tril.detach()
+            tril = tril.shrink(0, (0, self.tril.shape[0] - T))\
+                   .shrink(1, (0, self.tril.shape[1] - T))\
+                   .reshape([1, T, T])\
+                   .expand([B, T, T])
+            return tril
+        
+        assert len(input.shape) == 3, "BxTxC Tensor expected."
+        B,T,C = input.shape
+        q = self.query(input)
+        k = self.key(input)
+
+        w = q @ k.transpose() * k.shape[-1]**-0.5
+        tril = correct_tril_shape(B, T)
+        w = Tensor.masked_fill(w, tril == 0, float('-inf'))
+        w = w.softmax()
+        
+        v = self.value(input)
+        out = w @ v
+        return out
+        
+    def params(self) -> list[Tensor]:
+        return self.query.params() + self.key.params() + self.value.params()
+    
+    def __call__(self, input: Tensor) -> Tensor:
+        return self.forward(input)
+    
+class MultiHeadAttention(Module):
+    def __init__(self, embedding_dim: int, num_heads: int, head_size: int, context_len: int):
+        self.heads = [AttentionHead(embedding_dim, head_size, context_len) for _ in range(num_heads)]
+        self.proj = Linear(head_size * num_heads, embedding_dim)
+
+    def forward(self, input):
+        out = Tensor.concat(-1, *[h(input) for h in self.heads])
+        # out = self.proj(out)
+        return out
+    
+    def params(self) -> list[Tensor]:
+        p = self.proj.params()
+        for h in self.heads:
+            p += h.params()
+        return p
+    
+    def __call__(self, input: Tensor) -> Tensor:
+        return self.forward(input)
+    
+class Block(Module):
+    def __init__(self, embedding_dim: int, n_head: int, context_len: int):
+        head_size = embedding_dim // n_head
+        self.sa = MultiHeadAttention(embedding_dim, n_head, head_size, context_len)
+        self.ffwd = FeedFoward(embedding_dim)
+        self.ln1 = LayerNorm(embedding_dim)
+        self.ln2 = LayerNorm(embedding_dim)
+
+    def forward(self, input: Tensor):
+        #? NOTE: Ivan, 7. 1. 2024.
+        # In the original Transformer paper (Attention Is All You Need),
+        # add & norm is applied after the transformation (Post-LN), 
+        # but here we apply LayerNorm before the transformation (Pre-LN).
+        # This can make training more stable.
+        input = input + self.sa(self.ln1(input))
+        input = input + self.ffwd(self.ln2(input))
+        return input
+    
+    def params(self) -> list[Tensor]:
+        return self.sa.params() + self.ffwd.params() + self.ln1.params() + self.ln2.params()
 
 # Sequence module. Used to create chains of basic modules
 
@@ -184,3 +265,22 @@ class Sequence(Module):
         repr += ")"
         
         return repr
+    
+# Simple feed forward module    
+
+class FeedFoward(Module):
+    def __init__(self, embedding_dim: int):
+        self.net = Sequence(
+            Linear(embedding_dim, 4 * embedding_dim),
+            Relu(),
+            Linear(4 * embedding_dim, embedding_dim)
+        )
+
+    def forward(self, input: Tensor):
+        return self.net(input)
+    
+    def params(self) -> list[Tensor]:
+        return self.net.params()
+    
+    def __call__(self, input: Tensor) -> Tensor:
+        return self.forward(input)
