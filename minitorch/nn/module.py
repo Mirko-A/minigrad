@@ -123,16 +123,20 @@ class CrossEntropyLoss(Module):
 # Normalization modules
 
 class LayerNorm(Module):
-    def __init__(self, dim, eps = 1e-5):
+    def __init__(self, dim: int, eps: float = 1e-5, bias: bool = True):
         self.eps = eps
-        self.gamma = Tensor.ones(dim)
-        self.beta = Tensor.zeros(dim)
+        self.gamma = Tensor.ones([dim])
+        self.beta = Tensor.zeros([dim]) if bias else None
 
     def forward(self, input: Tensor) -> Tensor:
         mean = input.mean(-1, keepdims=True)
         var = input.var(-1, keepdims=True)
 
-        return ((input - mean) / (var + self.eps).sqrt()) * self.gamma + self.beta
+        out = ((input - mean) / (var + self.eps).sqrt()) * self.gamma
+        if self.beta is not None:
+            out = out + self.beta
+
+        return out
 
     def params(self) -> list[Tensor]:
         return [self.gamma, self.beta]
