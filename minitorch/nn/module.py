@@ -171,8 +171,8 @@ class PositionalEncoding(Module):
         self.d_model = d_model
         self.N = N
 
-    def forward(self, input: list[int]) -> Tensor:
-        L = len(input)
+    def forward(self, input: int) -> Tensor:
+        L = input
         encodings = []
 
         for k in range(L):
@@ -185,7 +185,7 @@ class PositionalEncoding(Module):
     def params(self) -> None:
         return None
     
-    def __call__(self, input: list[int]) -> Tensor:
+    def __call__(self, input: int) -> Tensor:
         return self.forward(input)
 
 
