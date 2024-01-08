@@ -230,15 +230,15 @@ class Tensor:
     def cat(self, axis: int, other: Tensor) -> Tensor:
         x, y = self, other
 
+        # Negative axes allowed
+        if axis < 0:
+            axis = len(self.shape) + axis
+            
         if DEBUG:
             assert isinstance(y, Tensor), \
                 f"Cannot concatenate, invalid operands provided. Expected: Tensors, got {type(y)}."
         assert all(x_dim == y_dim for dim_idx, (x_dim, y_dim) in enumerate(zip(x.shape, y.shape)) if dim_idx != axis), \
             f"Cannot concatenate, both Tensors must have the same shape along all axes except the one they're being concatenated along ({x.shape}, {y.shape})."
-
-        # Negative axes allowed
-        if axis < 0:
-            axis = len(self.shape) + axis
 
         x_pad_size = y.shape[axis]
         y_pad_size = x.shape[axis]

@@ -17,11 +17,11 @@ import numpy as np
 # 1 1 1
 
 def main2():
-    # ah = AttentionHead(16, 8, 16)
-    # t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
-    # t1 = t1/(4*16*16)
-    # h = ah(t1)
-    # print(h)
+    ah = AttentionHead(16, 16, 16)
+    t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
+    t1 = t1/(4*16*16)
+    h = ah(t1)
+    print(h)
     mha = Block(16, 4, 16)
     t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
     t1 = t1/(4*16*16)
