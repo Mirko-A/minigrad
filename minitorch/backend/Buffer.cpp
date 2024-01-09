@@ -53,7 +53,7 @@ namespace minitorch
             data.push_back(float(i));
         }
 
-        return MiniBuffer(data, std::vector<int>{1, end-start});
+        return MiniBuffer(data, std::vector<int>{end-start});
     }
 
     MiniBuffer MiniBuffer::fill(const std::vector<int>& shape, float value)
@@ -689,7 +689,7 @@ namespace minitorch
             new_row.push_back(0.0);
         }
 
-        for (int j = 0; j < input_shape[1]; j++)
+        for (int i = 0; i < input_shape[0]; i++)
         {
             new_row.push_back(input_data[current_pos]);
             current_pos++;

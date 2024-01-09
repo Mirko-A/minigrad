@@ -23,8 +23,8 @@ def get_batch(split: str = 'train', batch_size: int = 32, max_context_len: int =
     data = train_data if split == 'train' else val_data
     data_len = n if split == 'train' else text_len - n
     ix = [randint(0, data_len - max_context_len) for _ in range(batch_size)]
-    x = Tensor.concat(0, *[Tensor([encoded_text[i:i+max_context_len]]) for i in ix])
-    y = Tensor.concat(0, *[Tensor([encoded_text[i+1:i+max_context_len+1]]) for i in ix])
+    x = Tensor.concat(0, *[Tensor(encoded_text[i:i+max_context_len]) for i in ix])
+    y = Tensor.concat(0, *[Tensor(encoded_text[i+1:i+max_context_len+1]) for i in ix])
     return x, y
 
 x, y = get_batch()
