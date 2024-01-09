@@ -98,6 +98,7 @@ namespace minitorch
         // the operation is done, to bring back the original order.
         MiniBuffer swap_nth_axis_with_last(int n);
         
+        std::string to_string1() const;
         std::string to_string2() const;
         std::string to_string3() const;
         std::string to_string4() const;

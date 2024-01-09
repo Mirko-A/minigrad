@@ -698,4 +698,4 @@ class Tensor:
         return self.data.is_square()
 
     def __repr__(self) -> str:
-        return f"<Tensor:  {self.data} with grad {self.grad.data if self.grad else None}>"
+        return f"<Tensor: {self.data} with grad {self.grad.data if self.grad else None}>"

@@ -1201,8 +1201,7 @@ namespace minitorch
         {
             case 1:
             {
-                // Scalar (only has 1 element)
-                repr << this->m_Data[0];
+                repr << this->to_string1();
             }
             break;
             case 2:
@@ -1229,6 +1228,31 @@ namespace minitorch
         return repr.str();
     }
 
+    std::string MiniBuffer::to_string1() const
+    {
+        std::stringstream repr;
+        repr << std::setprecision(4) << std::fixed;
+        const auto& data = this->m_Data;
+        const auto& shape = this->m_Shape;
+
+        int current_pos = 0;
+        
+        for (int i = 0; i < shape[0]; i++)
+        {
+            if (i == (shape[0] - 1))
+            {
+                repr << data[current_pos];
+            }
+            else
+            {
+                repr << data[current_pos] << ", ";
+            }
+            current_pos++;
+        }
+
+        return repr.str();
+    }
+
     std::string MiniBuffer::to_string2() const
     {
         std::stringstream repr;
@@ -1246,7 +1270,7 @@ namespace minitorch
             }
             else
             {
-                repr << "           [";
+                repr << "          [";
             }
 
             for (int j = 0; j < shape[1]; j++)
@@ -1293,7 +1317,7 @@ namespace minitorch
             }
             else
             {
-                repr << "           [";
+                repr << "         [";
             }
 
             for (int j = 0; j < shape[1]; j++)
@@ -1304,7 +1328,7 @@ namespace minitorch
                 }
                 else
                 {
-                    repr << "            [";
+                    repr << "           [";
                 }
 
                 for (int k = 0; k < shape[2]; k++)
@@ -1361,7 +1385,7 @@ namespace minitorch
             }
             else
             {
-                repr << "           [";
+                repr << "         [";
             }
 
             for (int j = 0; j < shape[1]; j++)
@@ -1372,7 +1396,7 @@ namespace minitorch
                 }
                 else
                 {
-                    repr << "            [";
+                    repr << "          [";
                 }
 
                 for (int k = 0; k < shape[2]; k++)
@@ -1383,7 +1407,7 @@ namespace minitorch
                     }
                     else
                     {
-                        repr << "             [";
+                        repr << "            [";
                     }
 
                     for (int l = 0; l < shape[3]; l++)
