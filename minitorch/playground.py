@@ -3,6 +3,7 @@ from minitorch.nn.module import Sequence
 from minitorch.nn.optim import Adam
 from minitorch.nn.module import Sigmoid, Relu, Tanh, MSELoss, CrossEntropyLoss, AttentionHead, MultiHeadAttention, Block
 from minitorch.tensor import Tensor
+from minitorch.dtype import Dtype
 
 import time
 
@@ -18,13 +19,13 @@ import numpy as np
 
 def main2():
     ah = AttentionHead(16, 16, 16)
-    t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
-    t1 = t1/(4*16*16)
+    t1 = Tensor.arange(0, 4*16*16, dtype=Dtype.Float).reshape([4, 16, 16])
+    t1 = t1/(4.0*16.0*16.0)
     h = ah(t1)
     print(h)
     mha = Block(16, 4, 16)
-    t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
-    t1 = t1/(4*16*16)
+    t1 = Tensor.arange(0, 4*16*16, dtype=Dtype.Float).reshape([4, 16, 16])
+    t1 = t1/(4.0*16.0*16.0)
     h = mha(t1)
     print(h)
 
@@ -63,10 +64,10 @@ def main():
     adam = Adam(prki_net.params(), 0.05)
 
     input = Tensor.randn([4, 128])
-    target = Tensor([[0], 
-                     [1], 
-                     [1],
-                     [1]])
+    target = Tensor([[0.0], 
+                     [1.0], 
+                     [1.0],
+                     [1.0]])
 
     start = time.time()
 
@@ -87,4 +88,4 @@ def main():
     print(f"Total time (new code): {time.time() - start}")
 
 if __name__ == "__main__":
-    main2()
+    main()
