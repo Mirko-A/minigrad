@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from minitorch.tensor import Tensor
+from minitorch.dtype import Dtype
 from minitorch import helpers
 
 class Optimizer:
@@ -30,7 +31,7 @@ class SGD(Optimizer):
         self.momentum = momentum
         self.wd = weight_decay
         self.nesterov = nesterov
-        self.b = [Tensor.zeros(t.shape) for t in self.params] if not helpers.float_equal(self.momentum, 0.0) else None
+        self.b = [Tensor.zeros(t.shape, dtype=Dtype.Float) for t in self.params] if not helpers.float_equal(self.momentum, 0.0) else None
 
     def step(self) -> None:
         for i, t in enumerate(self.params):
@@ -57,8 +58,8 @@ class Adam(Optimizer):
         self.wd = weight_decay
         self.b1, self.b2 = betas[0], betas[1]
         self.eps = eps
-        self.m = [Tensor.zeros(t.shape) for t in self.params]
-        self.v = [Tensor.zeros(t.shape) for t in self.params]
+        self.m = [Tensor.zeros(t.shape, dtype=Dtype.Float) for t in self.params]
+        self.v = [Tensor.zeros(t.shape, dtype=Dtype.Float) for t in self.params]
         
     def step(self) -> None:
         for i, t in enumerate(self.params):

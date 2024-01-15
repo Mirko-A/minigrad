@@ -1,11 +1,10 @@
 from __future__ import annotations
 from typing import Optional, Type
-from random import gauss, uniform
-import numpy as np
 import math
 
-import Backend as cpp
 from minitorch import helpers
+from minitorch.storage import Storage
+from minitorch.dtype import Dtype
 from minitorch.settings import DEBUG
 
 class Function:
@@ -22,7 +21,7 @@ class Function:
     def apply(fn_ctor: Type[Function], *inputs: Tensor, **kwargs) -> Tensor: 
         # fn_ctor is the constructor of the child class from which 'apply' is called
         ctx = fn_ctor(*inputs)
-        result = Tensor(ctx.forward(*[input.data for input in inputs], **kwargs), ctx.output_requires_grad)
+        result = Tensor(ctx.forward(*[input.storage for input in inputs], **kwargs), ctx.output_requires_grad)
         
         # Keep the reference to the function which created the result
         # Used for autograd
@@ -34,37 +33,28 @@ class Function:
 import minitorch.ops as ops
 
 class Tensor:
-    __slots__ = ("data", "requires_grad", "grad", "_ctx")
+    __slots__ = ("storage", "requires_grad", "dtype", "grad", "_ctx")
     __deletable__ = ("_ctx",)
 
-    def __init__(self, data: float | int | list | cpp.MiniBuffer, requires_grad: bool = False):
-        if isinstance(data, cpp.MiniBuffer):
-            self.data = data
-        elif isinstance(data, float):
-            self.data = cpp.MiniBuffer([data], [1])
-        elif isinstance(data, int):
-            self.data = cpp.MiniBuffer([float(data)], [1])
-        elif isinstance(data, list):
-            self.data = Tensor._np_load(data)
-        else:
-            assert False, \
-                f"Cannot construct Tensor with given data: {type(data)}. Expected: int | float | list(nested)."
+    def __init__(self, data: float | int | list | Storage, requires_grad: bool = False, dtype: Dtype = Dtype.Float):
+        self.storage = data if isinstance(data, Storage) else Storage(data, dtype)
 
-        assert self.data.get_rank() <= 4, \
-            f"Cannot construct Tensor of rank {self.data.get_rank()}. Maximum supported rank is 4."
+        assert self.storage.rank <= 4, \
+            f"Cannot construct Tensor of rank {self.storage.rank}. Maximum supported rank is 4."
 
         self.requires_grad = requires_grad
+        self.dtype = dtype
         self.grad: Optional[Tensor] = None
         # Internal variable used for autograd graph construction
         self._ctx: Optional[Function] = None
 
     @property
     def shape(self) -> list[int]:
-        return self.data.get_shape()
+        return self.storage.shape
     
     @property
     def rank(self) -> int:
-        return self.data.get_rank()
+        return self.storage.rank
 
     @property
     def T(self) -> Tensor:
@@ -74,44 +64,42 @@ class Tensor:
     # TODO: Implement: one_hot
 
     @staticmethod
-    def fill(shape: list[int], value: float, requires_grad: bool = False) -> Tensor:
-        return Tensor(cpp.MiniBuffer.fill(shape, value), requires_grad)
+    def fill(shape: list[int], value: int | float, requires_grad: bool = False, dtype: Dtype = Dtype.Int) -> Tensor:
+        return Tensor(Storage.fill(shape, value, dtype), requires_grad)
 
     @staticmethod
-    def zeros(shape: list[int], requires_grad: bool = False) -> Tensor:
-        return Tensor.fill(shape, 0.0, requires_grad)
+    def zeros(shape: list[int], requires_grad: bool = False, dtype: Dtype = Dtype.Int) -> Tensor:
+        return Tensor.fill(shape, 0, requires_grad, dtype)
 
     @staticmethod
-    def ones(shape: list[int], requires_grad: bool = False) -> Tensor:
-        return Tensor.fill(shape, 1.0, requires_grad)
+    def ones(shape: list[int], requires_grad: bool = False, dtype: Dtype = Dtype.Int) -> Tensor:
+        return Tensor.fill(shape, 1, requires_grad, dtype)
 
     @staticmethod
-    def arange(start: int, end: int, requires_grad: bool = False):
-        return Tensor(cpp.MiniBuffer.arange(start, end), requires_grad)
+    def arange(start: int, end: int, requires_grad: bool = False, dtype: Dtype = Dtype.Int):
+        return Tensor(Storage.arange(start, end, dtype), requires_grad)
 
     @staticmethod
     def randn(shape: list[int], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
-        data = cpp.MiniBuffer([gauss(mean, std_dev) for _ in range(math.prod(shape))], shape)
-        return Tensor(data, requires_grad)
+        return Tensor(Storage.randn(shape, mean, std_dev), requires_grad)
 
     @staticmethod
     def uniform(shape: list[int], low: float, high: float, requires_grad: bool = False) -> Tensor:
-        data = cpp.MiniBuffer([uniform(low, high) for _ in range(math.prod(shape))], shape)
-        return Tensor(data, requires_grad)
+        return Tensor(Storage.uniform(shape, low, high), requires_grad)
 
     @staticmethod
     def masked_fill(input: Tensor, mask: list[bool], value: float) -> Tensor:
         if DEBUG:
             assert all(isinstance(mask_val, bool) for mask_val in mask), \
                    f"Invalid mask type provided. Expected list[bool]"
-        assert len(mask) == len(input.data), \
+        assert len(mask) == len(input.storage.data), \
                f"Cannot mask {input.shape} Tensor with mask of length {len(mask)}"
         
-        return Tensor(cpp.MiniBuffer.masked_fill(input.data, mask, value), input.requires_grad)
+        return Tensor(Storage.masked_fill(input.storage, mask, value), input.requires_grad)
 
     @staticmethod
-    def replace(input: Tensor, target: float, new: float) -> Tensor:
-        return Tensor(cpp.MiniBuffer.replace(input.data, target, new), input.requires_grad)
+    def replace(input: Tensor, target: float | int, new: float | int) -> Tensor:
+        return Tensor(Storage.replace(input.storage, target, new), input.requires_grad)
 
     @staticmethod
     def tril(input: Tensor, diagonal: int = 0) -> Tensor:
@@ -119,7 +107,7 @@ class Tensor:
         assert diagonal >= -3 and diagonal < 3, \
             f"Cannot apply tril, invalid value provided for diagonal parameter: {diagonal}. Expected range [-3, 2]."
         
-        return Tensor(cpp.MiniBuffer.tril(input.data, diagonal), input.requires_grad)
+        return Tensor(Storage.tril(input.storage, diagonal), input.requires_grad)
 
     @staticmethod
     def concat(axis: int, *inputs: Tensor) -> Tensor:
@@ -183,7 +171,7 @@ class Tensor:
     def pad(self, axis: int, pad_sizes: tuple[int, int]) -> Tensor:
         if DEBUG:
             assert isinstance(pad_sizes, tuple) and all(isinstance(size, int) for size in pad_sizes), \
-                    f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{pad_sizes}."
+                    f"Cannot pad, pad sizes expected type is tuple[int, int] but got type{type(pad_sizes)}."
 
         # Negative axes allowed
         if axis < 0:
@@ -242,8 +230,8 @@ class Tensor:
 
         x_pad_size = y.shape[axis]
         y_pad_size = x.shape[axis]
-        x = x.pad(axis, [0, x_pad_size])
-        y = y.pad(axis, [y_pad_size, 0])
+        x = x.pad(axis, (0, x_pad_size))
+        y = y.pad(axis, (y_pad_size, 0))
 
         return x + y
 
@@ -274,7 +262,7 @@ class Tensor:
                 axis = len(self.shape) + axis
 
             shape_squeezed = [s for i,s in enumerate(t.shape) if i != axis]
-            reuslt = ops.Sum.apply(t, axis=axis, keepdims=True)
+            reuslt = ops.Sum.apply(t, axis=axis)
 
             return reuslt if keepdims or axis is None else ops.Reshape.apply(reuslt, new_shape=shape_squeezed)
         
@@ -293,9 +281,9 @@ class Tensor:
         _sum = self.sum(axis, keepdims=keepdims)
 
         if axis is not None:
-            return _sum / self.shape[axis]
+            return _sum / float(self.shape[axis])
         else:
-            return _sum / math.prod(self.shape)
+            return _sum / float(math.prod(self.shape))
 
     def std(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         # Number of samples
@@ -304,12 +292,12 @@ class Tensor:
         N = max(1, N - 1)
 
         _mean = self.mean(axis, True)
-        deviation = ((self - _mean) ** 2)
+        deviation = ((self - _mean) ** 2.0)
         
-        return (deviation.sum(axis, keepdims) / N).sqrt()
+        return (deviation.sum(axis, keepdims) / float(N)).sqrt()
 
     def var(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
-        return self.std(axis, keepdims) ** 2
+        return self.std(axis, keepdims) ** 2.0
 
     #* Binary operations
 
@@ -407,7 +395,7 @@ class Tensor:
             assert isinstance(target, Tensor), \
                 f"Cannot calculate MSE loss, invalid target type. Expected Tensor, got {type(target)}."
 
-        square_error = (self - target) ** 2
+        square_error = (self - target) ** 2.0
         return square_error.mean(axis)
 
     def cross_entropy(self, target: Tensor, axis: Optional[int] = None) -> Tensor:
@@ -440,13 +428,13 @@ class Tensor:
     def backward(self):
         assert self.is_scalar(), f"Backward can only be called for scalar tensors, but it has shape {self.shape})"
 
-        self.grad = Tensor(1, requires_grad=False)
+        self.grad = Tensor(1.0, requires_grad=False)
         autograd_graph = self.toposort()
 
         for node in reversed(autograd_graph):
             assert node.grad is not None
 
-            grads = node._ctx.backward(node.grad.data)
+            grads = node._ctx.backward(node.grad.storage)
             grads = [Tensor(g, requires_grad=False) if g is not None else None
                         for g in ([grads] if len(node._ctx.parents) == 1 else grads)]
             
@@ -499,90 +487,135 @@ class Tensor:
     #* Binary operator magic methods
 
     def __add__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor addition, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.add(other)
     
     def __radd__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor addition, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.add(other, True)
     
     def __iadd__(self, other) -> Tensor: 
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor addition, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.assign(self.add(other))
 
     def __sub__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor subtraction, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.sub(other)
 
     def __rsub__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor subtraction, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.sub(other, True)
 
     def __isub__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor subtraction, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.assign(self.sub(other))
 
     def __mul__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor multiplication, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.mul(other)
     
     def __rmul__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor multiplication, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.mul(other, True)
 
     def __imul__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor multiplication, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.assign(self.mul(other))
 
     def __truediv__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor division, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.div(other)
     
     def __rtruediv__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor division, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.div(other, True)
     
     def __itruediv__(self, other) -> Tensor: 
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor division, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.assign(self.div(other))
 
     def __pow__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor exponentiation, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.pow(other)
 
     def __rpow__(self, other) -> Tensor:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor exponentiation, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
         return self.pow(other, True)
     
     def __ipow__(self, other) -> Tensor: 
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor exponentiation, operand types do not match ({self.dtype, other.dtype})."
         if not isinstance(other, Tensor): 
             other = Tensor(other)
 
@@ -590,43 +623,52 @@ class Tensor:
 
     def __matmul__(self, other) -> Tensor:
         if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor matrix multiplication, operand types do not match ({self.dtype, other.dtype})."
+        if DEBUG:
             assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
         
         return self.matmul(other)
     
     def __imatmul__(self, other) -> Tensor: 
         if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot perform Tensor matrix multiplication, operand types do not match ({self.dtype, other.dtype})."
+        if DEBUG:
             assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
         
         return self.assign(self.matmul(other))
 
     def __eq__(self, other) -> bool | list[bool]:
+        if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot check for Tensor equality (equal), operand types do not match ({self.dtype, other.dtype})."
         if isinstance(other, Tensor):
             assert self.shape == other.shape, f"Cannot compare {self.shape} and {other.shape} Tensors. Shapes must match."
 
-            return self.data == other.data
+            return self.storage == other.storage
         elif isinstance(other, (int, float)):
-            if isinstance(other, int): other = float(other)
-
-            return self.data == other
+            return self.storage == other
         else:
             assert False, f"Invalid type for Tensor equality: {type(other)}. Expected Tensor, int or float."
 
     def __lt__(self, other) -> list[bool]:
         if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot check for Tensor equality (less than), operand types do not match ({self.dtype, other.dtype})."
+        if DEBUG:
             assert isinstance(other, (int, float)), f"Invalid type for Tesnor less-than: {type(other)}. Expected int or float."
-        if isinstance(other, int): 
-            other = float(other)
 
-        return self.data < other
+        return self.storage < other
     
     def __gt__(self, other) -> list[bool]:
         if DEBUG:
+            assert self.dtype == other.dtype, \
+                f"Cannot check for Tensor equality (greater than), operand types do not match ({self.dtype, other.dtype})."
+        if DEBUG:
             assert isinstance(other, (int, float)), f"Invalid type for Tesnor greater-than: {type(other)}. Expected int or float."
-        if isinstance(other, int): 
-            other = float(other)
 
-        return self.data > other
+        return self.storage > other
 
     def __hash__(self) -> int:
         return id(self)
@@ -646,7 +688,7 @@ class Tensor:
         assert self.shape == x.shape, f"Assign shape mismatch {self.shape} != {x.shape}."
         assert not x.requires_grad
 
-        self.data = x.data
+        self.storage = x.storage
         
         return self
 
@@ -656,20 +698,10 @@ class Tensor:
     # to use data from the Tensors without adding those operations
     # to the graph.
     def detach(self) -> Tensor: 
-        return Tensor(self.data)
+        return Tensor(self.storage)
 
     #* Utility
     
-    @staticmethod
-    def _np_load(data: list) -> cpp.MiniBuffer:
-        _np = np.array(data)
-        shape = []
-
-        for dim in _np.shape:
-            shape.append(dim)
-        
-        return cpp.MiniBuffer(_np.reshape(-1).astype(np.float32).tolist(), shape)
-
     #? NOTE: Mirko, 25. 12. 2023
     # Some reshape operations require the Tensors shape
     # to match the provided shape. This helper fn can
@@ -691,11 +723,11 @@ class Tensor:
         return ops.Reshape.apply(x, new_shape=squeezed_shape)
 
     def is_scalar(self) -> bool:
-        return self.data.is_scalar()
+        return self.storage.is_scalar()
     
     def is_square(self) -> bool:
         assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
-        return self.data.is_square()
+        return self.storage.is_square()
 
     def __repr__(self) -> str:
-        return f"<Tensor: {self.data} with grad {self.grad.data if self.grad else None}>"
+        return f"<Tensor: {self.storage.buffer} with grad {self.grad.storage.buffer if self.grad else None}>"

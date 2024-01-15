@@ -3,6 +3,7 @@ from typing import Optional
 import math
 
 from minitorch.tensor import Tensor
+from minitorch.dtype import Dtype
 
 # Base class for all NN modules
 
@@ -128,8 +129,8 @@ class LayerNorm(Module):
 class LayerNorm(Module):
     def __init__(self, dim: int, eps: float = 1e-5, bias: bool = True):
         self.eps = eps
-        self.gamma = Tensor.ones([dim])
-        self.beta = Tensor.zeros([dim]) if bias else None
+        self.gamma = Tensor.ones([dim], dtype=Dtype.Float)
+        self.beta = Tensor.zeros([dim], dtype=Dtype.Float) if bias else None
 
     def forward(self, input: Tensor) -> Tensor:
         mean = input.mean(-1, keepdims=True)
@@ -196,7 +197,7 @@ class AttentionHead(Module):
         self.query = Linear(embedding_dim, head_size, need_bias=False)
         self.key = Linear(embedding_dim, head_size, need_bias=False)
         self.value = Linear(embedding_dim, head_size, need_bias=False)
-        self.tril = Tensor.tril(Tensor.ones([context_len, context_len]))
+        self.tril = Tensor.tril(Tensor.ones([context_len, context_len], dtype=Dtype.Float))
         
     def forward(self, input: Tensor) -> Tensor:
         def correct_tril_shape(B, T):
