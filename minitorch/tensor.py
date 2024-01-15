@@ -60,7 +60,7 @@ class Tensor:
     def T(self) -> Tensor:
         return self.transpose()
 
-    #* Static Matrix generation methods
+    #* Static Tensor generation methods
     # TODO: Implement: one_hot
 
     @staticmethod
@@ -76,8 +76,12 @@ class Tensor:
         return Tensor.fill(shape, 1, requires_grad, dtype)
 
     @staticmethod
-    def arange(start: int, end: int, requires_grad: bool = False, dtype: Dtype = Dtype.Int):
+    def arange(start: int, end: int, requires_grad: bool = False, dtype: Dtype = Dtype.Int) -> Tensor:
         return Tensor(Storage.arange(start, end, dtype), requires_grad)
+
+    @staticmethod
+    def one_hot(n_classes, hot_class) -> Tensor:
+        ...
 
     @staticmethod
     def randn(shape: list[int], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
@@ -251,10 +255,9 @@ class Tensor:
     def sum(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         x = self
 
-        if DEBUG:
-            assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
-
         def _sum(t: Tensor, axis: int, keepdims: bool = False) -> Tensor:
+            if DEBUG:
+                assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
             assert abs(axis) < len(self.shape), f"Cannot calculate sum, invalid axis provided. Tensor shape is {self.shape} but {axis}th dimension was provided."
 
             # Negative axes allowed
@@ -378,7 +381,7 @@ class Tensor:
         return ops.Sigmoid.apply(self)
     
     def tanh(self) -> Tensor:
-        return 2 * (2 * self).sigmoid() - 1
+        return 2.0 * (2.0 * self).sigmoid() - 1.0
 
     def relu(self) -> Tensor:
         return ops.Relu.apply(self)
@@ -487,137 +490,137 @@ class Tensor:
     #* Binary operator magic methods
 
     def __add__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor addition, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.add(other)
     
     def __radd__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor addition, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.add(other, True)
     
     def __iadd__(self, other) -> Tensor: 
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor addition, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.assign(self.add(other))
 
     def __sub__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor subtraction, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.sub(other)
 
     def __rsub__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor subtraction, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.sub(other, True)
 
     def __isub__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor subtraction, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.assign(self.sub(other))
 
     def __mul__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor multiplication, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.mul(other)
     
     def __rmul__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor multiplication, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.mul(other, True)
 
     def __imul__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor multiplication, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.assign(self.mul(other))
 
     def __truediv__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor division, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.div(other)
     
     def __rtruediv__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor division, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.div(other, True)
     
     def __itruediv__(self, other) -> Tensor: 
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor division, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.assign(self.div(other))
 
     def __pow__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor exponentiation, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.pow(other)
 
     def __rpow__(self, other) -> Tensor:
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor exponentiation, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.pow(other, True)
     
     def __ipow__(self, other) -> Tensor: 
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
         if DEBUG:
             assert self.dtype == other.dtype, \
                 f"Cannot perform Tensor exponentiation, operand types do not match ({self.dtype, other.dtype})."
-        if not isinstance(other, Tensor): 
-            other = Tensor(other)
 
         return self.assign(self.pow(other))
 

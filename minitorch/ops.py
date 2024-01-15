@@ -169,7 +169,7 @@ class Expand(Function):
 
 class Sigmoid(Function):
     def forward(self, x: Storage) -> Storage:
-        self.result = Storage.full_like(x, 1) / (Storage.full_like(x, 1) + Storage.full_like(x, math.e).pow(-x))
+        self.result = Storage.full_like(x, 1.0) / (Storage.full_like(x, 1.0) + Storage.full_like(x, math.e).pow(-x))
 
         return self.result
 
@@ -183,6 +183,6 @@ class Relu(Function):
 
     def backward(self, chain_grad: Storage) -> Storage:
         return chain_grad * Storage.masked_fill(Storage.full_like(self.result, 0.0),
-                                                       self.result > 0,
+                                                       self.result > 0.0,
                                                        1.0)
 
