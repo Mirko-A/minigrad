@@ -119,9 +119,6 @@ class CrossEntropyLoss(Module):
 
     def __call__(self, input: Tensor, target: Tensor) -> Tensor:
         return self.forward(input, target)
-    
-class LayerNorm(Module):
-    ...
 
 # Normalization modules
 
@@ -155,10 +152,14 @@ class Embedding(Module):
         self.embedding_dim = embedding_dim
         self.embeddings = [Tensor.randn([1, embedding_dim]) for _ in range(n_embeddings)]
 
-    def forward(self, input: list[int]) -> Tensor:
-        embeddings = [self.embeddings[i] for i in input]
+    def forward(self, input: Tensor) -> Tensor:
+        # ? NOTE: Ivan, 14.1.2024.
+        # Casting indeces to int is a temporary hack until MiniBuffer supports integers
+        embeddings = [self.embeddings[int(i)] for i in input.data]
 
-        return Tensor.concat(0, *embeddings).reshape([len(input), self.embedding_dim])
+        new_shape = input.shape.copy()
+        new_shape.append(self.embedding_dim)
+        return Tensor.concat(0, *embeddings).reshape(new_shape)
     
     def params(self) -> list[Tensor]:
         return self.embeddings
@@ -234,7 +235,7 @@ class MultiHeadAttention(Module):
 
     def forward(self, input):
         out = Tensor.concat(-1, *[h(input) for h in self.heads])
-        # out = self.proj(out)
+        out = self.proj(out)
         return out
     
     def params(self) -> list[Tensor]:
@@ -242,49 +243,6 @@ class MultiHeadAttention(Module):
         for h in self.heads:
             p += h.params()
         return p
-    
-    def __call__(self, input: Tensor) -> Tensor:
-        return self.forward(input)
-
-# TODO: Ivan, 7. 1. 2024.
-# Move these modules into examples/gpt.py once it is created.
-class Block(Module):
-    class FeedFoward(Module):
-        def __init__(self, embedding_dim: int):
-            self.net = Sequence(
-                Linear(embedding_dim, 4 * embedding_dim),
-                Relu(),
-                Linear(4 * embedding_dim, embedding_dim)
-            )
-
-        def forward(self, input: Tensor):
-            return self.net(input)
-        
-        def params(self) -> list[Tensor]:
-            return self.net.params()
-        
-        def __call__(self, input: Tensor) -> Tensor:
-            return self.forward(input)
-    
-    def __init__(self, embedding_dim: int, n_head: int, context_len: int):
-        head_size = embedding_dim // n_head
-        self.sa = MultiHeadAttention(embedding_dim, n_head, head_size, context_len)
-        self.ffwd = Block.FeedFoward(embedding_dim)
-        self.ln1 = LayerNorm(embedding_dim)
-        self.ln2 = LayerNorm(embedding_dim)
-
-    def forward(self, input: Tensor):
-        #? NOTE: Ivan, 7. 1. 2024.
-        # In the original Transformer paper (Attention Is All You Need),
-        # add & norm is applied after the transformation (Post-LN), 
-        # but here we apply LayerNorm before the transformation (Pre-LN).
-        # This can make training more stable.
-        input = input + self.sa(self.ln1(input))
-        input = input + self.ffwd(self.ln2(input))
-        return input
-    
-    def params(self) -> list[Tensor]:
-        return self.sa.params() + self.ffwd.params() + self.ln1.params() + self.ln2.params()
     
     def __call__(self, input: Tensor) -> Tensor:
         return self.forward(input)
