@@ -1,7 +1,7 @@
 from minitorch.nn.module import Linear
 from minitorch.nn.module import Sequence
 from minitorch.nn.optim import Adam
-from minitorch.nn.module import Sigmoid, Relu, Tanh, MSELoss, CrossEntropyLoss, AttentionHead, MultiHeadAttention, Block
+from minitorch.nn.module import Sigmoid, MSELoss
 from minitorch.tensor import Tensor
 
 import time
@@ -13,21 +13,6 @@ import numpy as np
 # 0 1 2
 # 3 4 5
 # 6 7 8
-
-# 1 1 1
-
-def main2():
-    ah = AttentionHead(16, 16, 16)
-    t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
-    t1 = t1/(4*16*16)
-    h = ah(t1)
-    print(h)
-    mha = Block(16, 4, 16)
-    t1 = Tensor.arange(0, 4*16*16).reshape([4, 16, 16])
-    t1 = t1/(4*16*16)
-    h = mha(t1)
-    print(h)
-
 
 def main1():
     start = time.time()
@@ -87,4 +72,4 @@ def main():
     print(f"Total time (new code): {time.time() - start}")
 
 if __name__ == "__main__":
-    main2()
+    main1()
