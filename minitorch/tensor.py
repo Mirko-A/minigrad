@@ -22,7 +22,7 @@ class Function:
     def apply(fn_ctor: Type[Function], *inputs: Tensor, **kwargs) -> Tensor: 
         # fn_ctor is the constructor of the child class from which 'apply' is called
         ctx = fn_ctor(*inputs)
-        result = Tensor(ctx.forward(*[input.data for input in inputs], **kwargs), ctx.output_requires_grad)
+        result = Tensor(ctx.forward(*[input._data for input in inputs], **kwargs), ctx.output_requires_grad)
         
         # Keep the reference to the function which created the result
         # Used for autograd
@@ -34,24 +34,24 @@ class Function:
 import minitorch.ops as ops
 
 class Tensor:
-    __slots__ = ("data", "requires_grad", "grad", "_ctx")
+    __slots__ = ("_data", "requires_grad", "grad", "_ctx")
     __deletable__ = ("_ctx",)
 
     def __init__(self, data: float | int | list | cpp.MiniBuffer, requires_grad: bool = False):
         if isinstance(data, cpp.MiniBuffer):
-            self.data = data
+            self._data = data
         elif isinstance(data, float):
-            self.data = cpp.MiniBuffer([data], [1])
+            self._data = cpp.MiniBuffer([data], [1])
         elif isinstance(data, int):
-            self.data = cpp.MiniBuffer([float(data)], [1])
+            self._data = cpp.MiniBuffer([float(data)], [1])
         elif isinstance(data, list):
-            self.data = Tensor._np_load(data)
+            self._data = Tensor._np_load(data)
         else:
             assert False, \
                 f"Cannot construct Tensor with given data: {type(data)}. Expected: int | float | list(nested)."
 
-        assert self.data.get_rank() <= 4, \
-            f"Cannot construct Tensor of rank {self.data.get_rank()}. Maximum supported rank is 4."
+        assert self._data.get_rank() <= 4, \
+            f"Cannot construct Tensor of rank {self._data.get_rank()}. Maximum supported rank is 4."
 
         self.requires_grad = requires_grad
         self.grad: Optional[Tensor] = None
@@ -59,12 +59,16 @@ class Tensor:
         self._ctx: Optional[Function] = None
 
     @property
+    def data(self) -> list[int]:
+        return self._data.get_data()
+
+    @property
     def shape(self) -> list[int]:
-        return self.data.get_shape()
+        return self._data.get_shape()
     
     @property
     def rank(self) -> int:
-        return self.data.get_rank()
+        return self._data.get_rank()
 
     @property
     def T(self) -> Tensor:
@@ -104,14 +108,14 @@ class Tensor:
         if DEBUG:
             assert all(isinstance(mask_val, bool) for mask_val in mask), \
                    f"Invalid mask type provided. Expected list[bool]"
-        assert len(mask) == len(input.data), \
+        assert len(mask) == len(input._data), \
                f"Cannot mask {input.shape} Tensor with mask of length {len(mask)}"
         
-        return Tensor(cpp.MiniBuffer.masked_fill(input.data, mask, value), input.requires_grad)
+        return Tensor(cpp.MiniBuffer.masked_fill(input._data, mask, value), input.requires_grad)
 
     @staticmethod
     def replace(input: Tensor, target: float, new: float) -> Tensor:
-        return Tensor(cpp.MiniBuffer.replace(input.data, target, new), input.requires_grad)
+        return Tensor(cpp.MiniBuffer.replace(input._data, target, new), input.requires_grad)
 
     @staticmethod
     def tril(input: Tensor, diagonal: int = 0) -> Tensor:
@@ -119,7 +123,7 @@ class Tensor:
         assert diagonal >= -3 and diagonal < 3, \
             f"Cannot apply tril, invalid value provided for diagonal parameter: {diagonal}. Expected range [-3, 2]."
         
-        return Tensor(cpp.MiniBuffer.tril(input.data, diagonal), input.requires_grad)
+        return Tensor(cpp.MiniBuffer.tril(input._data, diagonal), input.requires_grad)
 
     @staticmethod
     def concat(axis: int, *inputs: Tensor) -> Tensor:
@@ -145,7 +149,7 @@ class Tensor:
         assert 0 not in new_shape, \
             f"Zeros not allowed in shape ({new_shape})."
         assert math.prod(new_shape) == math.prod(self.shape), \
-            f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(new_shape)} != {math.prod(self.shape)})."
+            f"Cannot reshape Tensor. Number of elements must remain the same ({math.prod(self.shape)} != {math.prod(new_shape)})."
         
         return ops.Reshape.apply(self, new_shape=[s for s in new_shape])
     
@@ -446,7 +450,7 @@ class Tensor:
         for node in reversed(autograd_graph):
             assert node.grad is not None
 
-            grads = node._ctx.backward(node.grad.data)
+            grads = node._ctx.backward(node.grad._data)
             grads = [Tensor(g, requires_grad=False) if g is not None else None
                         for g in ([grads] if len(node._ctx.parents) == 1 else grads)]
             
@@ -494,7 +498,7 @@ class Tensor:
     def __getitem__(self, keys: tuple[int, ...]) -> float:
         assert len(keys) == len(self.shape), \
             f"Cannot retreive an element from Tensor with given key: {keys}. Key must match Tensor's shape ({self.shape})."
-        return self.data[keys]
+        return self._data[keys]
     
     #* Binary operator magic methods
 
@@ -604,11 +608,11 @@ class Tensor:
         if isinstance(other, Tensor):
             assert self.shape == other.shape, f"Cannot compare {self.shape} and {other.shape} Tensors. Shapes must match."
 
-            return self.data == other.data
+            return self._data == other._data
         elif isinstance(other, (int, float)):
             if isinstance(other, int): other = float(other)
 
-            return self.data == other
+            return self._data == other
         else:
             assert False, f"Invalid type for Tensor equality: {type(other)}. Expected Tensor, int or float."
 
@@ -618,7 +622,7 @@ class Tensor:
         if isinstance(other, int): 
             other = float(other)
 
-        return self.data < other
+        return self._data < other
     
     def __gt__(self, other) -> list[bool]:
         if DEBUG:
@@ -626,7 +630,7 @@ class Tensor:
         if isinstance(other, int): 
             other = float(other)
 
-        return self.data > other
+        return self._data > other
 
     def __hash__(self) -> int:
         return id(self)
@@ -646,7 +650,7 @@ class Tensor:
         assert self.shape == x.shape, f"Assign shape mismatch {self.shape} != {x.shape}."
         assert not x.requires_grad
 
-        self.data = x.data
+        self._data = x._data
         
         return self
 
@@ -656,7 +660,7 @@ class Tensor:
     # to use data from the Tensors without adding those operations
     # to the graph.
     def detach(self) -> Tensor: 
-        return Tensor(self.data)
+        return Tensor(self._data)
 
     #* Utility
     
@@ -691,11 +695,11 @@ class Tensor:
         return ops.Reshape.apply(x, new_shape=squeezed_shape)
 
     def is_scalar(self) -> bool:
-        return self.data.is_scalar()
+        return self._data.is_scalar()
     
     def is_square(self) -> bool:
         assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
-        return self.data.is_square()
+        return self._data.is_square()
 
     def __repr__(self) -> str:
-        return f"<Tensor: {self.data} with grad {self.grad.data if self.grad else None}>"
+        return f"<Tensor: {self._data} with grad {self.grad._data if self.grad else None}>"
