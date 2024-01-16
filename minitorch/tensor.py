@@ -86,8 +86,12 @@ class Tensor:
         return Tensor.fill(shape, 1.0, requires_grad)
 
     @staticmethod
-    def arange(start: int, end: int, requires_grad: bool = False):
+    def arange(start: int, end: int, requires_grad: bool = False) -> Tensor:
         return Tensor(cpp.MiniBuffer.arange(start, end), requires_grad)
+
+    def one_hot(n_classes: int, hot_class: int, requires_grad: bool = False) -> Tensor:
+        data = [1 if i == hot_class else 0 for i in range(n_classes)]
+        return Tensor(data, requires_grad) 
 
     @staticmethod
     def randn(shape: list[int], mean: float = 0.0, std_dev: float = 1.0, requires_grad: bool = False) -> Tensor:
