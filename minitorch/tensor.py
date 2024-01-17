@@ -74,8 +74,7 @@ class Tensor:
     def T(self) -> Tensor:
         return self.transpose()
 
-    #* Static Matrix generation methods
-    # TODO: Implement: one_hot
+    #* Static methods
 
     @staticmethod
     def fill(shape: list[int], value: float, requires_grad: bool = False) -> Tensor:
