@@ -117,11 +117,13 @@ class GPT(Module):
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -max_context_len:]
             logits, loss = self(idx_cond)
+            timestep_cnt = logits.shape[1] # Take T from (B, T, C)
+            logits = logits.shrink(1, (timestep_cnt - 1, 0))
     
     def params(self) -> list[Tensor]:
         return self.embedding.params() + self.blocks.params() + self.ln_f.params() + self.lm_head.params()
     
-    def __call__(self, idx: Tensor, targets: Tensor = None) -> Tensor:
+    def __call__(self, idx: Tensor, targets: Tensor = None):
         return self.forward(idx, targets)
     
 config = GPTConfig(max_context_len=256, vocab_size=vocab_size, n_layer=6, n_head=6, embedding_dim=64)
