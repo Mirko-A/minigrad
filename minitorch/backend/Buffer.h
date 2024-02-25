@@ -45,6 +45,8 @@ namespace minitorch
         MiniBuffer sum();
         MiniBuffer sum(int axis);
 
+        MiniBuffer multinomial(int num_samples, bool replacement) const;
+
         // Mutate operations
         MiniBuffer reshape(const std::vector<int> new_shape) const;
         MiniBuffer flatten() const; 
@@ -72,9 +74,15 @@ namespace minitorch
         MiniBuffer tril3(int diagonal) const;
         MiniBuffer tril4(int diagonal) const;
 
+        MiniBuffer sum1() const;
         MiniBuffer sum2() const;
         MiniBuffer sum3() const;
         MiniBuffer sum4() const;
+
+        MiniBuffer multinomial1(int num_samples, bool replacement) const;
+        MiniBuffer multinomial2(int num_samples, bool replacement) const;
+        MiniBuffer multinomial3(int num_samples, bool replacement) const;
+        MiniBuffer multinomial4(int num_samples, bool replacement) const;
 
         MiniBuffer pad1(const std::tuple<int, int> pad_sizes) const;
         MiniBuffer pad2(const std::tuple<int, int> pad_sizes) const;

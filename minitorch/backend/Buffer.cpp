@@ -5,6 +5,8 @@
 #include <cassert>
 #include <sstream>
 #include <iomanip>
+#include <cstdlib>
+#include <ctime>
 
 #include "Buffer.h"
 
@@ -449,6 +451,25 @@ namespace minitorch
 
         return result;
     }
+
+    MiniBuffer MiniBuffer::sum1() const
+    {
+        const auto& input_data = this->m_Data;
+        const auto& input_shape = this->m_Shape;
+
+        std::vector<float> data{};
+
+        float sum = 0.0;
+        for (int i = 0; i < input_shape[0]; i++)
+        {
+            sum += input_data[i];
+        }
+        
+        data.push_back(sum);
+
+        std::vector<int> output_shape{1};
+        return MiniBuffer(data, output_shape);
+    }
     
     MiniBuffer MiniBuffer::sum2() const
     {
@@ -558,18 +579,16 @@ namespace minitorch
 
     MiniBuffer MiniBuffer::sum(int axis)
     {
-        size_t rank = this->m_Rank;
-
-        if (rank == 1)
-        {
-            // No need to sum a scalar
-            return *this;
-        }
-
         MiniBuffer x = this->swap_nth_axis_with_last(axis);
 
+        size_t rank = this->m_Rank;
         switch (rank)
         {
+            case 1:
+            {
+                x = x.sum1();
+            }
+            break;
             case 2:
             {
                 x = x.sum2();
@@ -591,6 +610,211 @@ namespace minitorch
         }
         
         return x.swap_nth_axis_with_last(axis);
+    }
+
+    MiniBuffer MiniBuffer::multinomial1(int num_samples, bool replacement) const
+    {
+        const auto& input_data = this->m_Data;
+        const auto& input_shape = this->m_Shape;
+
+        std::vector<float> data{};
+        int batches = std::accumulate(input_shape.begin(), input_shape.end() - 1, 1, std::multiplies<int>());
+        data.reserve(batches * num_samples);
+
+        int current_pos = 0;
+
+        for (int sample = 0; sample < num_samples; sample++)
+        {
+            float cummulative_prob = 0.0;
+            float prob_threshold = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+            
+            for (int i = 0; i < input_shape[0]; i++)
+            {
+                cummulative_prob += input_data[current_pos + i];
+                // cummulative_prob crossed the threshold
+                if (cummulative_prob > prob_threshold)
+                {
+                    // Save the index and advance the cursor
+                    // to account for the loop break
+                    data.push_back(i);
+                    break;
+                }
+            }
+        }
+
+        std::vector<int> output_shape(input_shape.begin(), input_shape.end() - 1);
+        output_shape.push_back(num_samples);
+
+        return MiniBuffer(data, output_shape);
+    }
+
+    MiniBuffer MiniBuffer::multinomial2(int num_samples, bool replacement) const
+    {
+        const auto& input_data = this->m_Data;
+        const auto& input_shape = this->m_Shape;
+
+        std::vector<float> data{};
+        int batches = std::accumulate(input_shape.begin(), input_shape.end() - 1, 1, std::multiplies<int>());
+        data.reserve(batches * num_samples);
+
+        int current_pos = 0;
+
+        for (int i = 0; i < input_shape[0]; i++)
+        {
+            for (int sample = 0; sample < num_samples; sample++)
+            {
+                float cummulative_prob = 0.0;
+                float prob_threshold = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+
+                for (int j = 0; j < input_shape[1]; j++)
+                {
+                    cummulative_prob += input_data[current_pos + j];
+                    // cummulative_prob crossed the threshold
+                    if (cummulative_prob > prob_threshold)
+                    {
+                        // Save the index and advance the cursor
+                        // to account for the loop break
+                        data.push_back(j);
+                        break;
+                    }
+                }
+            }
+
+            current_pos += input_shape[1];
+        }
+
+        std::vector<int> output_shape(input_shape.begin(), input_shape.end() - 1);
+        output_shape.push_back(num_samples);
+
+        return MiniBuffer(data, output_shape);
+    }
+    
+    MiniBuffer MiniBuffer::multinomial3(int num_samples, bool replacement) const
+    {
+        const auto& input_data = this->m_Data;
+        const auto& input_shape = this->m_Shape;
+
+        std::vector<float> data{};
+        int batches = std::accumulate(input_shape.begin(), input_shape.end() - 1, 1, std::multiplies<int>());
+        data.reserve(batches * num_samples);
+
+        int current_pos = 0;
+
+        for (int i = 0; i < input_shape[0]; i++)
+        {
+            for (int j = 0; j < input_shape[1]; j++)
+            {
+                for (int sample = 0; sample < num_samples; sample++)
+                {
+                    float cummulative_prob = 0.0;
+                    float prob_threshold = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+
+                    for (int k = 0; k < input_shape[2]; k++)
+                    {
+                        cummulative_prob += input_data[current_pos + k];
+                        // cummulative_prob crossed the threshold
+                        if (cummulative_prob > prob_threshold)
+                        {
+                            // Save the index and advance the cursor
+                            // to account for the loop break
+                            data.push_back(k);
+                            break;
+                        }
+                    }
+                }
+
+                current_pos += input_shape[2];
+            }
+        }
+
+        std::vector<int> output_shape(input_shape.begin(), input_shape.end() - 1);
+        output_shape.push_back(num_samples);
+
+        return MiniBuffer(data, output_shape);
+    }
+    
+    MiniBuffer MiniBuffer::multinomial4(int num_samples, bool replacement) const
+    {
+        const auto& input_data = this->m_Data;
+        const auto& input_shape = this->m_Shape;
+
+        std::vector<float> data{};
+        int batches = std::accumulate(input_shape.begin(), input_shape.end() - 1, 1, std::multiplies<int>());
+        data.reserve(batches * num_samples);
+
+        int current_pos = 0;
+
+        for (int i = 0; i < input_shape[0]; i++)
+        {
+            for (int j = 0; j < input_shape[1]; j++)
+            {
+                for (int k = 0; k < input_shape[2]; k++)
+                {
+                    for (int sample = 0; sample < num_samples; sample++)
+                    {
+                        float cummulative_prob = 0.0;
+                        float prob_threshold = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+
+                        for (int l = 0; l < input_shape[3]; l++)
+                        {
+                            cummulative_prob += input_data[current_pos + l];
+                            // cummulative_prob crossed the threshold
+                            if (cummulative_prob > prob_threshold)
+                            {
+                                // Save the index and advance the cursor
+                                // to account for the loop break
+                                data.push_back(l);
+                                break;
+                            }
+                        }
+                    }
+
+                    current_pos += input_shape[3];
+                }
+            }
+        }
+
+        std::vector<int> output_shape(input_shape.begin(), input_shape.end() - 1);
+        output_shape.push_back(num_samples);
+
+        return MiniBuffer(data, output_shape);
+    }
+
+    MiniBuffer MiniBuffer::multinomial(int num_samples, bool replacement) const
+    {
+        MiniBuffer x = *this;
+        size_t seed = std::hash<unsigned int>{}(static_cast<unsigned>(time(0)));
+        srand(seed);
+
+        size_t rank = this->m_Rank;
+        switch (rank)
+        {
+            case 1:
+            {
+                x = x.multinomial1(num_samples, replacement);
+            }
+            break;
+            case 2:
+            {
+                x = x.multinomial2(num_samples, replacement);
+            }
+            break;
+            case 3:
+            {
+                x = x.multinomial3(num_samples, replacement);
+            }
+            break;
+            case 4:
+            {
+                x = x.multinomial4(num_samples, replacement);
+            }
+            break;
+            default:
+                assert(false && "Cannot execute multinomial, invalid rank provided.");
+                break;
+        }
+        
+        return x;
     }
 
     MiniBuffer MiniBuffer::reshape(const std::vector<int> new_shape) const

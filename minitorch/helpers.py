@@ -10,5 +10,5 @@ def argfix(*x):
 def float_equal(x: float, y: float) -> bool:
     assert isinstance(x, float) and isinstance(y, float), \
         f"Cannot compare {type(x)} and {type(y)}. Expected: float and float."
-    
-    return abs(x - y) > 1e-8
+
+    return abs(x - y) < 1e-6
