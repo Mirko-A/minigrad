@@ -59,7 +59,7 @@ class Tensor:
         self._ctx: Optional[Function] = None
 
     @property
-    def data(self) -> list[int]:
+    def data(self) -> list[float]:
         return self._data.get_data()
 
     @property
@@ -319,7 +319,7 @@ class Tensor:
     def var(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         return self.std(axis, keepdims) ** 2
     
-    def multinomial(self, num_samples: int = 1, replacement: bool = False):
+    def multinomial(self, num_samples: int = 1, replacement: bool = False) -> Tensor:
         return Tensor(cpp.MiniBuffer.multinomial(input._data, num_samples, replacement), input.requires_grad)
 
     #* Binary operations
@@ -707,6 +707,10 @@ class Tensor:
     def is_square(self) -> bool:
         assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
         return self._data.is_square()
+    
+    def item(self) -> float:
+        assert self.is_scalar(), f"a Tensor with {len(self.data)} elements cannot be converted to Scalar."
+        return self.data[0]
 
     def __repr__(self) -> str:
         return f"<Tensor: {self._data} with grad {self.grad._data if self.grad else None}>"
