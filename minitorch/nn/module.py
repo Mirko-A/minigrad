@@ -1,12 +1,24 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 import math
+from dataclasses import dataclass
 
 from minitorch.tensor import Tensor
 
 # Base class for all NN modules
-
 class Module(ABC):
+    def eval(self):
+        params = self.params()
+        if params is not None:
+            for p in params:
+                ...
+                
+    def train(self):
+        params = self.params()
+        if params is not None:
+            for p in params:
+                ...
+    
     @abstractmethod
     def forward(self, input) -> Tensor:
         ...
