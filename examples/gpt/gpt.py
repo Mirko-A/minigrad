@@ -22,13 +22,16 @@ n = int(0.9*text_len)
 # train_data = Tensor([encoded_text[:n]])
 # val_data = Tensor([encoded_text[n:]])
 
-def get_batch(split: str = 'train', batch_size: int = 32, max_context_len: int = 256):
+def get_batch(split: str = 'train', batch_size: int = 16, max_context_len: int = 128):
     # data = train_data if split == 'train' else val_data
     data_len = n if split == 'train' else text_len - n
     ix = [randint(0, data_len - max_context_len) for _ in range(batch_size)]
     x = Tensor.concat(0, *[Tensor([encoded_text[i:i+max_context_len]]) for i in ix])
     y = Tensor.concat(0, *[Tensor.concat(0, *[Tensor.one_hot(vocab_size, j).reshape(1, vocab_size)\
         for j in encoded_text[i+1:i+max_context_len+1]]) for i in ix]).reshape([batch_size, max_context_len, vocab_size])
+    # print(f'X: {x}')
+    # print(f'Y: {y}')  
+    
     # y = Tensor.concat(0, *[Tensor([encoded_text[i+1:i+max_context_len+1]]) for i in ix])
     return x, y
 
@@ -111,7 +114,7 @@ class GPT(Module):
         B, T = idx.shape
 
         tok_emb = self.embedding(idx)
-        pos_enc = self.pos_encoding(range(0, T))
+        pos_enc = self.pos_encoding(T)
         x = tok_emb + pos_enc
         x = self.blocks(x)
         x = self.ln_f(x)
@@ -157,6 +160,7 @@ eval_iters = 20
 eval_interval = 50
 
 for iter in range(max_iters):
+    print(f'Iteracija BROJ: {iter}')
     if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
