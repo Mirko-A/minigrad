@@ -39,7 +39,7 @@ def multinomial(probabilities, num_samples=1):
     num_categories = len(probabilities)
 
     # Generate random samples
-    samples = [0] * num_categories
+    samples = []
 
     for _ in range(num_samples):
         rand_num = random.random()
@@ -48,7 +48,7 @@ def multinomial(probabilities, num_samples=1):
         for i in range(num_categories):
             cumulative_prob += probabilities[i]
             if rand_num < cumulative_prob:
-                samples[i] += 1
+                samples.append(i)
                 break
 
     return samples
@@ -60,24 +60,20 @@ num_samples = 1000
 samples = multinomial(probabilities, num_samples)
 samples_np = multinomial_np(probabilities, num_samples)
 
-print(f'KLOT:\n{samples}\nNAMPAJ:\n{samples_np}')
+# print(f'KLOT:\n{samples}\nNAMPAJ:\n{samples_np}')
 
 
 def main1():
     start = time.time()
 
-    t1 = Tensor.arange(0, 2*64*64, True).reshape([2, 64, 64])
-    t1 = t1 / 1000
-    t2 = Tensor.arange(0, 2*64*64, True).reshape([2, 64, 64])
-    t2 = t2 / 1000
-    #print(t)
-    #t2 = Tensor.arange(0, 16).reshape([2, 2, 2, 2])
-
-    for _ in range(100):
-        y = t1 @ t2
-
-    print(y)
-    print(f"Time: {time.time() - start}")
+    t1 = Tensor([[0.0, 0.0, 0.0, 0.25, 0.5, 0.25, 0.25, 0.0, 0.0, 0.0],
+                 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                 [0.0, 0.0, 0.0, 0.25, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0]])
+    # t1 = Tensor.arange(0, 2*10*10, True).reshape([2, 10, 10])
+    # t1 = torch.arange(0, 2*10*10, dtype=torch.float32).reshape([2, 10, 10])
+    # print(t1)
+    print(t1.softmax())
+    print(t1.softmax().multinomial(num_samples=4))
 
 def main0():
     t = Tensor.arange(0, 3 * 3, True).reshape((3, 3))
@@ -120,5 +116,5 @@ def main():
 
     print(f"Total time (new code): {time.time() - start}")
 
-# if __name__ == "__main__":
-#     multinomial()
+if __name__ == "__main__":
+    main1()

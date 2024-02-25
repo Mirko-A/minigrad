@@ -272,7 +272,7 @@ class Tensor:
         x = self
 
         if DEBUG:
-            assert isinstance(axis, int), f"Cannot calculate sum, invalid axis provided. Expected int but got {type(axis)}."
+            assert isinstance(axis, int), f"Cannot calculate sum, invalid axis type provided. Expected int but got {type(axis)}."
 
         def _sum(t: Tensor, axis: int, keepdims: bool = False) -> Tensor:
             assert abs(axis) < len(self.shape), f"Cannot calculate sum, invalid axis provided. Tensor shape is {self.shape} but {axis}th dimension was provided."
@@ -319,8 +319,12 @@ class Tensor:
     def var(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         return self.std(axis, keepdims) ** 2
     
+    # TODO: Mirko, 25.02.2024.
+    # Multinomial doesn't use the replacement parameter  
     def multinomial(self, num_samples: int = 1, replacement: bool = False) -> Tensor:
-        return Tensor(cpp.MiniBuffer.multinomial(input._data, num_samples, replacement), input.requires_grad)
+        assert all(helpers.float_equal(s, 1.0) for s in self.sum(axis=-1).data), \
+            "Cannot perform multinomial, Tensor rows must be probability distributions."
+        return Tensor(cpp.MiniBuffer.multinomial(self._data, num_samples, replacement), self.requires_grad)
 
     #* Binary operations
 

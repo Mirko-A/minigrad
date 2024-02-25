@@ -43,6 +43,7 @@ namespace minitorch
                 // Reduction
                 .def("sum", static_cast<MiniBuffer (MiniBuffer::*)()>(&MiniBuffer::sum))
                 .def("sum", static_cast<MiniBuffer (MiniBuffer::*)(int)>(&MiniBuffer::sum))
+                .def("multinomial", &MiniBuffer::multinomial)
                 // Mutation
                 .def("reshape", &MiniBuffer::reshape)
                 .def("flatten", &MiniBuffer::flatten)
