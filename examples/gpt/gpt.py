@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from minitorch.tensor import Tensor
 from minitorch.nn.module import Module, Linear, Relu, CrossEntropyLoss, LayerNorm, Embedding, PositionalEncoding, Sequence, MultiHeadAttention
+from minitorch.nn.optim import Adam
 
 with open('./examples/gpt/the_sopranos_pilot.txt', 'r', encoding='utf-8') as f:
     text = f.read()
@@ -30,6 +31,20 @@ def get_batch(split: str = 'train', batch_size: int = 32, max_context_len: int =
         for j in encoded_text[i+1:i+max_context_len+1]]) for i in ix]).reshape([batch_size, max_context_len, vocab_size])
     # y = Tensor.concat(0, *[Tensor([encoded_text[i+1:i+max_context_len+1]]) for i in ix])
     return x, y
+
+def estimate_loss():
+    out = {}
+    model.eval()
+    for split in ['train', 'val']:
+        losses = []
+        X, Y = get_batch(split)
+        for _ in range(eval_iters):
+            logits, loss = model(X, Y)
+            losses.append(loss.item())
+        losses = Tensor(losses)
+        out[split] = losses.mean()
+    model.train()
+    return out
 
 class Block(Module):
     class FeedFoward(Module):
@@ -81,7 +96,7 @@ class GPTConfig:
     embedding_dim: int
 
 class GPT(Module):
-    def __init__(self, config):
+    def __init__(self, config: GPTConfig):
         self.embedding = Embedding(config.vocab_size, config.embedding_dim)
         self.pos_encoding = PositionalEncoding(config.embedding_dim)
         self.blocks = Sequence(*[Block(config.embedding_dim, n_head=config.n_head, context_len=config.max_context_len) for _ in range(config.n_layer)])
@@ -113,12 +128,20 @@ class GPT(Module):
 
         return logits, l
     
-    def generate(self, idx: Tensor, max_new_tokens: int, max_context_len: int):
+    def generate(self, idx: Tensor, max_new_tokens: int, max_context_len: int) -> Tensor:
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -max_context_len:]
+            token_cnt = idx.shape[1]
+            idx_cond = idx.shrink(1, (token_cnt - max_context_len, 0))
             logits, loss = self(idx_cond)
             timestep_cnt = logits.shape[1] # Take T from (B, T, C)
             logits = logits.shrink(1, (timestep_cnt - 1, 0))
+            probs = logits.softmax()
+            # TODO: Ivan, 24.2.2024.
+            # Create multinomial function
+            idx_next = probs.multinomial(num_samples=1)
+            idx = Tensor.concat(1, idx, idx_next)
+        
+        return idx
     
     def params(self) -> list[Tensor]:
         return self.embedding.params() + self.blocks.params() + self.ln_f.params() + self.lm_head.params()
@@ -127,3 +150,24 @@ class GPT(Module):
         return self.forward(idx, targets)
     
 config = GPTConfig(max_context_len=256, vocab_size=vocab_size, n_layer=6, n_head=6, embedding_dim=64)
+model = GPT(config)
+adam = Adam(model.params(), 0.05)
+max_iters = 500
+eval_iters = 20
+eval_interval = 50
+
+for iter in range(max_iters):
+    if iter % eval_interval == 0 or iter == max_iters - 1:
+        losses = estimate_loss()
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+    
+    xb, yb = get_batch()
+    logits, loss = model(xb, yb)
+    adam.zero_grad()
+    loss.backward()
+    adam.step()
+
+context = Tensor.zeros([1])
+generated_text = model.generate(context, max_new_tokens=200, max_context_len=64).flatten().data()
+generated_text = [int(idx) for idx in generated_text]
+print(decode(generated_text))
