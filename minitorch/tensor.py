@@ -318,6 +318,9 @@ class Tensor:
 
     def var(self, axis: Optional[int] = None, keepdims: bool = False) -> Tensor:
         return self.std(axis, keepdims) ** 2
+    
+    def multinomial(self, num_samples: int = 1, replacement: bool = False):
+        return Tensor(cpp.MiniBuffer.multinomial(input._data, num_samples, replacement), input.requires_grad)
 
     #* Binary operations
 
