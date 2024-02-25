@@ -11,13 +11,13 @@ class Module(ABC):
         params = self.params()
         if params is not None:
             for p in params:
-                p.assign(Tensor(p.data))
+                p.requires_grad = False
                 
     def train(self):
         params = self.params()
         if params is not None:
             for p in params:
-                p.assign(Tensor(p.data, requires_grad=True))
+                p.requires_grad = True
     
     @abstractmethod
     def forward(self, input) -> Tensor:
