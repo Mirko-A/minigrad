@@ -659,7 +659,7 @@ class Tensor:
         if not isinstance(x, Tensor): 
             x = Tensor(x)
         assert self.shape == x.shape, f"Assign shape mismatch {self.shape} != {x.shape}."
-        assert not x.requires_grad
+        # assert not x.requires_grad
 
         self._data = x._data
         

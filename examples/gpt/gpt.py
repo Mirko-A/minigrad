@@ -6,6 +6,8 @@ from minitorch.nn.module import Module, Linear, Relu, CrossEntropyLoss, LayerNor
 from minitorch.nn.optim import Adam
 
 import time
+import sys
+sys.setrecursionlimit(1500)
 
 with open('./examples/gpt/the_sopranos_pilot.txt', 'r', encoding='utf-8') as f:
     text = f.read()
@@ -45,7 +47,7 @@ def estimate_loss():
         X, Y = get_batch(split)
         for iter in range(eval_iters):
             print(f'    Eval iteration ({split}): {iter}')
-            logits, loss = model(X, Y)
+            _, loss = model(X, Y)
             losses.append(loss.item())
         losses = Tensor(losses)
         out[split] = losses.mean()
