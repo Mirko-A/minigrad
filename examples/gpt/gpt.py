@@ -5,6 +5,8 @@ from minitorch.tensor import Tensor
 from minitorch.nn.module import Module, Linear, Relu, CrossEntropyLoss, LayerNorm, Embedding, PositionalEncoding, Sequence, MultiHeadAttention
 from minitorch.nn.optim import Adam
 
+import time
+
 with open('./examples/gpt/the_sopranos_pilot.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 
@@ -41,7 +43,8 @@ def estimate_loss():
     for split in ['train', 'val']:
         losses = []
         X, Y = get_batch(split)
-        for _ in range(eval_iters):
+        for iter in range(eval_iters):
+            print(f'    Eval iteration ({split}): {iter}')
             logits, loss = model(X, Y)
             losses.append(loss.item())
         losses = Tensor(losses)
@@ -125,7 +128,7 @@ class GPT(Module):
         else:
             B, T, C = logits.shape
             logits = logits.reshape(B*T, C)
-            targets = targets.reshape(B*T)
+            targets = targets.reshape(B*T, C)
             softmax = logits.softmax()
             l = self.loss(softmax, targets)
 
@@ -152,7 +155,7 @@ class GPT(Module):
     def __call__(self, idx: Tensor, targets: Tensor = None):
         return self.forward(idx, targets)
     
-config = GPTConfig(max_context_len=256, vocab_size=vocab_size, n_layer=6, n_head=6, embedding_dim=64)
+config = GPTConfig(max_context_len=128, vocab_size=vocab_size, n_layer=4, n_head=4, embedding_dim=32)
 model = GPT(config)
 adam = Adam(model.params(), 0.05)
 max_iters = 500
@@ -160,10 +163,10 @@ eval_iters = 20
 eval_interval = 50
 
 for iter in range(max_iters):
-    print(f'Iteracija BROJ: {iter}')
+    print(f'Training iteration: {iter}')
     if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        print(f"step {iter}: train loss {losses['train']}, val loss {losses['val']}")
     
     xb, yb = get_batch()
     logits, loss = model(xb, yb)
