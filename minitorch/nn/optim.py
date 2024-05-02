@@ -18,7 +18,7 @@ class Optimizer:
 
     def zero_grad(self) -> None:
         for p in self.params:
-            p.grad = None
+            p.grad = Tensor(0)
 
 class SGD(Optimizer):
     def __init__(self, params: list[Tensor], 
