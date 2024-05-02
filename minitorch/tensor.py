@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import deque
 from typing import Optional, Type
 from random import gauss, uniform
 import numpy as np
@@ -438,19 +439,24 @@ class Tensor:
     #* Backpropagation
 
     def toposort(self):
-        def _toposort(node: Tensor, visited: set[Tensor], nodes: list[Tensor]):
-            visited.add(node)
+        def _toposort(node: Tensor, nodes: list[Tensor]) -> list[Tensor]:
+            visited = set()
+            stack = [node]
 
-            if getattr(node, "_ctx", None):
-                for parent in node._ctx.parents:
-                    if parent not in visited: 
-                        _toposort(parent, visited, nodes)
+            while stack:
+                current_node = stack.pop()
+                visited.add(current_node)
 
-                nodes.append(node)
+                if getattr(current_node, "_ctx", None):
+                    for parent in current_node._ctx.parents:
+                        if parent not in visited:
+                            stack.append(parent)
+
+                    nodes.append(current_node)
 
             return nodes
-      
-        return _toposort(self, set(), [])
+        
+        return _toposort(self, [])
 
     def backward(self):
         assert self.is_scalar(), f"Backward can only be called for scalar tensors, but it has shape {self.shape})"
@@ -458,7 +464,7 @@ class Tensor:
         self.grad = Tensor(1, requires_grad=False)
         autograd_graph = self.toposort()
 
-        for node in reversed(autograd_graph):
+        for node in autograd_graph:
             assert node.grad is not None
 
             grads = node._ctx.backward(node.grad._data)
@@ -470,8 +476,6 @@ class Tensor:
                     assert grad.shape == parent.shape, f"Grad shape must match Tensor shape, {grad.shape} != {parent.shape} ({node._ctx})"
                     parent.grad = grad if parent.grad is None else (parent.grad + grad)
             
-            del node._ctx
-
     #* Broadcasting
 
     def _broadcasted(self, y: Tensor) -> tuple[Tensor, Tensor]:
@@ -648,6 +652,11 @@ class Tensor:
 
     #* Data handlers
 
+    # TODO: Mirko, 05.02.2024
+    # Switching between 'train' and 'eval' mode was not compati-
+    # ble with the previous version of this function. That is
+    # why the lines are commented out. Find a better way to set
+    # the requires_grad field.
     #? NOTE: Mirko, 24. 12. 2023
     # This function shall be used whenever a Tensor needs to be
     # modified inplace. It is essentially a shallow copy.
@@ -662,6 +671,7 @@ class Tensor:
         # assert not x.requires_grad
 
         self._data = x._data
+        self.requires_grad = x.requires_grad
         
         return self
 
@@ -715,6 +725,9 @@ class Tensor:
     def item(self) -> float:
         assert self.is_scalar(), f"a Tensor with {len(self.data)} elements cannot be converted to Scalar."
         return self.data[0]
+
+    def numel(self) -> int:
+        return len(self.data)
 
     def __repr__(self) -> str:
         return f"<Tensor: {self._data} with grad {self.grad._data if self.grad else None}>"

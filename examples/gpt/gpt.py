@@ -26,7 +26,7 @@ n = int(0.9*text_len)
 # train_data = Tensor([encoded_text[:n]])
 # val_data = Tensor([encoded_text[n:]])
 
-def get_batch(split: str = 'train', batch_size: int = 16, max_context_len: int = 128):
+def get_batch(split: str = 'train', batch_size: int = 64, max_context_len: int = 256):
     # data = train_data if split == 'train' else val_data
     data_len = n if split == 'train' else text_len - n
     ix = [randint(0, data_len - max_context_len) for _ in range(batch_size)]
@@ -44,7 +44,7 @@ def estimate_loss():
     model.eval()
     for split in ['train', 'val']:
         losses = []
-        X, Y = get_batch(split)
+        X, Y = get_batch(split, 16, 64)
         for iter in range(eval_iters):
             print(f'    Eval iteration ({split}): {iter}')
             _, loss = model(X, Y)
@@ -139,14 +139,17 @@ class GPT(Module):
     def generate(self, idx: Tensor, max_new_tokens: int, max_context_len: int) -> Tensor:
         for _ in range(max_new_tokens):
             token_cnt = idx.shape[1]
-            idx_cond = idx.shrink(1, (token_cnt - max_context_len, 0))
+            if token_cnt > max_context_len:
+                idx_cond = idx.shrink(1, (token_cnt - max_context_len, 0))
+            else:
+                idx_cond = idx
             logits, loss = self(idx_cond)
             timestep_cnt = logits.shape[1] # Take T from (B, T, C)
             logits = logits.shrink(1, (timestep_cnt - 1, 0))
             probs = logits.softmax()
             # TODO: Ivan, 24.2.2024.
             # Create multinomial function
-            idx_next = probs.multinomial(num_samples=1)
+            idx_next = probs.multinomial(num_samples=1).reshape([1, 1])
             idx = Tensor.concat(1, idx, idx_next)
         
         return idx
@@ -157,26 +160,29 @@ class GPT(Module):
     def __call__(self, idx: Tensor, targets: Tensor = None):
         return self.forward(idx, targets)
     
-config = GPTConfig(max_context_len=128, vocab_size=vocab_size, n_layer=4, n_head=4, embedding_dim=32)
+config = GPTConfig(max_context_len=64, vocab_size=vocab_size, n_layer=4, n_head=4, embedding_dim=64)
 model = GPT(config)
-adam = Adam(model.params(), 0.05)
-max_iters = 500
+adam = Adam(model.params(), 3e-4)
+max_iters = 5000
 eval_iters = 20
 eval_interval = 50
 
-for iter in range(max_iters):
+param_cnt = sum([p.numel() for p in model.params()])
+print(f"Number of parameters: {param_cnt}")
+
+for iter in range(1, max_iters + 1):
     print(f'Training iteration: {iter}')
     if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']}, val loss {losses['val']}")
     
-    xb, yb = get_batch()
+    xb, yb = get_batch(batch_size=16, max_context_len=64)
     logits, loss = model(xb, yb)
     adam.zero_grad()
     loss.backward()
     adam.step()
 
-context = Tensor.zeros([1])
-generated_text = model.generate(context, max_new_tokens=200, max_context_len=64).flatten().data()
-generated_text = [int(idx) for idx in generated_text]
+context = Tensor.zeros([1, 1])
+generated_text = model.generate(context, max_new_tokens=200, max_context_len=64).flatten().data
+generated_text = [round(idx) for idx in generated_text]
 print(decode(generated_text))
