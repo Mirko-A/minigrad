@@ -226,8 +226,16 @@ class AttentionHead(Module):
         k = self.key(input)
 
         w = q @ k.transpose() * k.shape[-1]**-0.5
+        
         tril = correct_tril_shape(B, T)
-        w = Tensor.masked_fill(w, tril == 0, float('-inf'))
+        # w = Tensor.masked_fill(w, tril == 0, float('-inf'))
+        # TODO: Mirko, 04.05.2024.
+        # Temporary hack since Tensor.masked_fill would remove the w
+        # Tensor from the autograd graph. Need to see how this is im-
+        # plemented in other frameworks.
+        w_tril = Tensor.masked_fill(w, tril == 0, float('-inf'))
+        w.assign(w_tril)
+        
         w = w.softmax()
         
         v = self.value(input)

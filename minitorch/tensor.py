@@ -671,6 +671,14 @@ class Tensor:
         # assert not x.requires_grad
 
         self._data = x._data
+        # TODO: Mirko, 04.05.2024.
+        # Temporary hack since it's sometimes necessary to create a
+        # copy of a Tensor (including the ._ctx and grad fields) in
+        # order to perform some operations without leaving the auto-
+        # grad graph.
+        self._ctx = x._ctx
+        self.grad = x.grad
+        
         self.requires_grad = x.requires_grad
         
         return self
