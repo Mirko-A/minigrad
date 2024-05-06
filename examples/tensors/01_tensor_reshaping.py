@@ -34,7 +34,7 @@ t3 = t3.pad(1, (1, 2)) # Pad the Tensor with zeros along the 1st axis. There wil
 
 t4 = Tensor.randn([4, 4])
 # print(t4)
-t4 = t4.shrink(0, (2, 0)) # Shrink the Tensor by removing two values from the start
+t4 = t4.slice(0, (2, 0)) # Shrink the Tensor by removing two values from the start
                             # and zero values from the end of a given axis (0 in this case).
 # print(t4)
 

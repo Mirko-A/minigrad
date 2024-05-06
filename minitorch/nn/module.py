@@ -162,16 +162,12 @@ class Embedding(Module):
     def __init__(self, n_embeddings: int, embedding_dim: int):
         self.n_embeddings = n_embeddings
         self.embedding_dim = embedding_dim
-        self.embeddings = [Tensor.randn([1, embedding_dim]) for _ in range(n_embeddings)]
+        self.embeddings = [Tensor.randn((1, embedding_dim)) for _ in range(n_embeddings)]
 
     def forward(self, input: Tensor) -> Tensor:
-        # ? NOTE: Ivan, 14.1.2024.
-        # Casting indeces to int is a temporary hack until MiniBuffer supports integers
-        embeddings = [self.embeddings[int(i)] for i in input.data]
+        embeddings = [self.embeddings[i] for i in input.flatten()._np]
 
-        new_shape = input.shape.copy()
-        new_shape.append(self.embedding_dim)
-        return Tensor.concat(0, *embeddings).reshape(new_shape)
+        return Tensor.stack(embeddings).reshape(input.shape + (self.embedding_dim, ))
     
     def params(self) -> list[Tensor]:
         return self.embeddings
@@ -209,32 +205,16 @@ class AttentionHead(Module):
         self.query = Linear(embedding_dim, head_size, need_bias=False)
         self.key = Linear(embedding_dim, head_size, need_bias=False)
         self.value = Linear(embedding_dim, head_size, need_bias=False)
-        self.tril = Tensor.tril(Tensor.ones([context_len, context_len]))
+        self.tril = Tensor.ones([context_len, context_len]).tril()
         
     def forward(self, input: Tensor) -> Tensor:
-        def correct_tril_shape(B, T):
-            tril = self.tril.detach()
-            tril = tril.shrink(0, (0, self.tril.shape[0] - T))\
-                   .shrink(1, (0, self.tril.shape[1] - T))\
-                   .reshape([1, T, T])\
-                   .expand([B, T, T])
-            return tril
-        
         assert len(input.shape) == 3, "BxTxC Tensor expected."
         B,T,C = input.shape
         q = self.query(input)
         k = self.key(input)
 
         w = q @ k.transpose() * k.shape[-1]**-0.5
-        
-        tril = correct_tril_shape(B, T)
-        # w = Tensor.masked_fill(w, tril == 0, float('-inf'))
-        # TODO: Mirko, 04.05.2024.
-        # Temporary hack since Tensor.masked_fill would remove the w
-        # Tensor from the autograd graph. Need to see how this is im-
-        # plemented in other frameworks.
-        w_tril = Tensor.masked_fill(w, tril == 0, float('-inf'))
-        w.assign(w_tril)
+        w = Tensor.masked_fill(w, self.tril[:T, :T] == 0, float('-inf'))
         
         w = w.softmax()
         
@@ -254,7 +234,7 @@ class MultiHeadAttention(Module):
         self.proj = Linear(head_size * num_heads, embedding_dim)
 
     def forward(self, input):
-        out = Tensor.concat(-1, *[h(input) for h in self.heads])
+        out = Tensor.concat([h(input) for h in self.heads], -1)
         out = self.proj(out)
         return out
     
