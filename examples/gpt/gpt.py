@@ -30,13 +30,12 @@ def get_batch(split: str = 'train', batch_size: int = 64, max_context_len: int =
     # data = train_data if split == 'train' else val_data
     data_len = n if split == 'train' else text_len - n
     ix = [randint(0, data_len - max_context_len) for _ in range(batch_size)]
-    x = Tensor.concat(0, *[Tensor([encoded_text[i:i+max_context_len]]) for i in ix])
-    y = Tensor.concat(0, *[Tensor.concat(0, *[Tensor.one_hot(vocab_size, j).reshape(1, vocab_size)\
+    x = Tensor.stack([Tensor([encoded_text[i:i+max_context_len]]).squeeze() for i in ix])
+    y = Tensor.stack([Tensor.stack([Tensor.one_hot(vocab_size, j).reshape(1, vocab_size)\
         for j in encoded_text[i+1:i+max_context_len+1]]) for i in ix]).reshape([batch_size, max_context_len, vocab_size])
-    # print(f'X: {x}')
+    # print(f'X: {x.shape}')
     # print(f'Y: {y}')  
     
-    # y = Tensor.concat(0, *[Tensor([encoded_text[i+1:i+max_context_len+1]]) for i in ix])
     return x, y
 
 def estimate_loss():
@@ -44,7 +43,7 @@ def estimate_loss():
     model.eval()
     for split in ['train', 'val']:
         losses = []
-        X, Y = get_batch(split, 16, 64)
+        X, Y = get_batch(split, 16, 32)
         for iter in range(eval_iters):
             print(f'    Eval iteration ({split}): {iter}')
             _, loss = model(X, Y)
@@ -140,12 +139,12 @@ class GPT(Module):
         for _ in range(max_new_tokens):
             token_cnt = idx.shape[1]
             if token_cnt > max_context_len:
-                idx_cond = idx.shrink(1, (token_cnt - max_context_len, 0))
+                idx_cond = idx.slice(1, (token_cnt - max_context_len, 0))
             else:
                 idx_cond = idx
             logits, loss = self(idx_cond)
             timestep_cnt = logits.shape[1] # Take T from (B, T, C)
-            logits = logits.shrink(1, (timestep_cnt - 1, 0))
+            logits = logits.slice(1, (timestep_cnt - 1, 0))
             probs = logits.softmax()
             # TODO: Ivan, 24.2.2024.
             # Create multinomial function
@@ -160,14 +159,14 @@ class GPT(Module):
     def __call__(self, idx: Tensor, targets: Tensor = None):
         return self.forward(idx, targets)
     
-config = GPTConfig(max_context_len=64, vocab_size=vocab_size, n_layer=4, n_head=4, embedding_dim=64)
+config = GPTConfig(max_context_len=32, vocab_size=vocab_size, n_layer=4, n_head=4, embedding_dim=32)
 model = GPT(config)
-adam = Adam(model.params(), 3e-4)
-max_iters = 5000
+adam = Adam(model.params(), 1e-4)
+max_iters = 50
 eval_iters = 20
 eval_interval = 50
 
-param_cnt = sum([p.numel() for p in model.params()])
+param_cnt = sum([p.num_el() for p in model.params()])
 print(f"Number of parameters: {param_cnt}")
 
 for iter in range(1, max_iters + 1):
@@ -176,7 +175,7 @@ for iter in range(1, max_iters + 1):
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']}, val loss {losses['val']}")
     
-    xb, yb = get_batch(batch_size=16, max_context_len=64)
+    xb, yb = get_batch(batch_size=16, max_context_len=32)
     logits, loss = model(xb, yb)
     adam.zero_grad()
     loss.backward()
