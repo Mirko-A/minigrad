@@ -1,527 +1,608 @@
 import unittest
-import math
-
 from minitorch.tensor import Tensor
+from minitorch.storage import Storage
 
-class TestTensorGenerationFuncs(unittest.TestCase):
-    def test_tensor_full(self):
-        a = Tensor.full((3, 2), 1.3)
+class TestTensor(unittest.TestCase):
+    def test_init(self):
+        # Test initialization with data and dtype
+        data = [1, 2, 3]
+        dtype = Tensor.Dtype.Int
+        tensor = Tensor(data, dtype=dtype)
+        self.assertTrue(tensor._storage.eq(Storage(data)))
+        self.assertEqual(tensor.dtype, dtype)
+        self.assertFalse(tensor.requires_grad)
+        self.assertIsNone(tensor.grad)
+        self.assertIsNone(tensor._ctx)
 
-        # Check dims
-        self.assertEqual(a.shape[0], 3)
-        self.assertEqual(a.shape[1], 2)
+        # Test initialization with Storage object
+        storage = Storage(data)
+        tensor = Tensor(storage)
+        self.assertTrue(tensor._storage.eq(storage))
+        self.assertFalse(tensor.requires_grad)
+        self.assertIsNone(tensor.grad)
+        self.assertIsNone(tensor._ctx)
 
-        # Check data
-        self.assertTrue(all((a == 1.3)._np.flatten().tolist()))
+        # Test initialization with data, dtype, and requires_grad
+        requires_grad = True
+        tensor = Tensor(data, dtype=dtype, requires_grad=requires_grad)
+        self.assertTrue(tensor._storage.eq(Storage(data)))
+        self.assertEqual(tensor.dtype, dtype)
+        self.assertTrue(tensor.requires_grad)
+        self.assertIsNone(tensor.grad)
+        self.assertIsNone(tensor._ctx)
 
-    def test_tensor_zeros(self):
-        a = Tensor.zeros((2, 4))
+    def test_shape(self):
+        # Test shape property
+        data = [[1, 2, 3], [4, 5, 6]]
+        tensor = Tensor(data)
+        self.assertEqual(tensor.shape, (2, 3))
 
-        # Check dims
-        self.assertEqual(a.shape[0], 2)
-        self.assertEqual(a.shape[1], 4)
+    def test_ndim(self):
+        # Test ndim property
+        data = [[1, 2, 3], [4, 5, 6]]
+        tensor = Tensor(data)
+        self.assertEqual(tensor.ndim, 2)
 
-        # Check data
-        self.assertTrue(all((a == 0.0)._np.flatten().tolist()))
+    def test_T(self):
+        # Test T property
+        data = [[1, 2, 3], [4, 5, 6]]
+        tensor = Tensor(data)
+        transposed_tensor = tensor.T
+        expected_data = [[1, 4], [2, 5], [3, 6]]
+        self.assertTrue(transposed_tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(transposed_tensor.shape, (3, 2))
 
-    def test_tensor_randn(self):
-        a = Tensor.randn((5, 1))
+    def test_full(self):
+        # Test full static method
+        shape = (2, 3)
+        value = 5
+        tensor = Tensor.full(shape, value)
+        expected_data = [[5, 5, 5], [5, 5, 5]]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, shape)
 
-        # Check dims
-        self.assertEqual(a.shape[0], 5)
-        self.assertEqual(a.shape[1], 1)
+    def test_full_like(self):
+        # Test full_like static method
+        shape = (2, 3)
+        value = 5
+        other = Tensor.ones(shape)
+        tensor = Tensor.full_like(other, value)
+        expected_data = [[5, 5, 5], [5, 5, 5]]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, shape)
 
-        # Impossible to check random data 
+    def test_zeros(self):
+        # Test zeros static method
+        shape = (2, 3)
+        tensor = Tensor.zeros(shape)
+        expected_data = [[0, 0, 0], [0, 0, 0]]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, shape)
+
+    def test_ones(self):
+        # Test ones static method
+        shape = (2, 3)
+        tensor = Tensor.ones(shape)
+        expected_data = [[1, 1, 1], [1, 1, 1]]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, shape)
+
+    def test_arange(self):
+        # Test arange static method
+        start = 0
+        end = 5
+        tensor = Tensor.arange(start, end)
+        expected_data = [0, 1, 2, 3, 4]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, (5,))
+
+    def test_one_hot(self):
+        # Test one_hot static method
+        n_classes = 5
+        hot_class = 2
+        tensor = Tensor.one_hot(n_classes, hot_class)
+        expected_data = [0, 0, 1, 0, 0]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, (5,))
+
+    def test_randn(self):
+        # Test randn static method
+        shape = (2, 3)
+        tensor = Tensor.randn(shape)
+        self.assertEqual(tensor.shape, shape)
+
+    def test_uniform(self):
+        # Test uniform static method
+        shape = (2, 3)
+        low = 0
+        high = 1
+        tensor = Tensor.uniform(shape, low, high)
+        self.assertEqual(tensor.shape, shape)
+
+    def test_masked_fill(self):
+        # Test masked_fill function
+        data = [1, 2, 3, 4, 5]
+        mask = Tensor([True, False, True, False, True])
+        value = 10
+        tensor = Tensor(data)
+        filled_tensor = tensor.masked_fill(mask, value)
+        expected_data = [10, 2, 10, 4, 10]
+        self.assertTrue(filled_tensor._storage.eq(Storage(expected_data)))
+
+    def test_replace(self):
+        # Test replacing a single value
+        data = [3, 2, 3, 4, 5]
+        target = 3
+        new_value = 10
+        tensor = Tensor(data)
+        replaced_tensor = tensor.replace(target, new_value)
+        expected_data = [10, 2, 10, 4, 5]
+        self.assertTrue(replaced_tensor._storage.eq(Storage(expected_data)))
+
+    def test__tri(self):
+        # Test _tri method with positive offset
+        row = 4
+        col = 4
+        offset = 1
+        tensor = Tensor._tri(row, col, offset=offset)
+        expected_data = [[1, 0, 0, 0],
+                         [1, 1, 0, 0],
+                         [1, 1, 1, 0],
+                         [1, 1, 1, 1]]
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, (row, col))
+
+        # Test _tri method with negative offset
+        offset = -1
+        tensor = Tensor._tri(row, col, offset=offset)
+        expected_data = [[0, 0, 0, 0],
+                         [0, 0, 0, 0],
+                         [1, 0, 0, 0],
+                         [1, 1, 0, 0]]
+        
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, (row, col))
+
+        # Test _tri method with zero offset
+        offset = 0
+        tensor = Tensor._tri(row, col, offset=offset)
+        expected_data = [[0, 0, 0, 0],
+                         [1, 0, 0, 0],
+                         [1, 1, 0, 0],
+                         [1, 1, 1, 0]]
+        
+        self.assertTrue(tensor._storage.eq(Storage(expected_data)))
+        self.assertEqual(tensor.shape, (row, col))
+
+    def test_add_scalar(self):
+        # Test addition of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        result = tensor + 5
+        expected_data = [6, 7, 8]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_add_tensor(self):
+        # Test addition of two tensors
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        result = tensor1 + tensor2
+        expected_data = [5, 7, 9]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_add_scalar(self):
+        # Test reverse addition of scalar with a tensor
+        tensor = Tensor([1, 2, 3])
+        result = 5 + tensor
+        expected_data = [6, 7, 8]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_add_tensor(self):
+        # Test reverse addition of tensor with another tensor
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        result = tensor2 + tensor1
+        expected_data = [5, 7, 9]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_iadd_scalar(self):
+        # Test in-place addition of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        tensor += 5
+        expected_data = [6, 7, 8]
+        self.assertTrue(tensor._storage.eq(Tensor(expected_data)._storage))
+
+    def test_iadd_tensor(self):
+        # Test in-place addition of two tensors
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        tensor1 += tensor2
+        expected_data = [5, 7, 9]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+    def test_sub_scalar(self):
+        # Test subtraction of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        result = tensor - 1
+        expected_data = [0, 1, 2]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_sub_tensor(self):
+        # Test subtraction of two tensors
+        tensor1 = Tensor([4, 5, 6])
+        tensor2 = Tensor([1, 2, 3])
+        result = tensor1 - tensor2
+        expected_data = [3, 3, 3]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_sub_scalar(self):
+        # Test reverse subtraction of scalar with a tensor
+        tensor = Tensor([1, 2, 3])
+        result = 5 - tensor
+        expected_data = [4, 3, 2]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_sub_tensor(self):
+        # Test reverse subtraction of tensor with another tensor
+        tensor1 = Tensor([4, 5, 6])
+        tensor2 = Tensor([1, 2, 3])
+        result = tensor2 - tensor1
+        expected_data = [-3, -3, -3]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_isub_scalar(self):
+        # Test in-place subtraction of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        tensor -= 1
+        expected_data = [0, 1, 2]
+        self.assertTrue(tensor._storage.eq(Tensor(expected_data)._storage))
+
+    def test_isub_tensor(self):
+        # Test in-place subtraction of two tensors
+        tensor1 = Tensor([4, 5, 6])
+        tensor2 = Tensor([1, 2, 3])
+        tensor1 -= tensor2
+        expected_data = [3, 3, 3]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+    def test_scalar_multiplication(self):
+        # Test scalar multiplication
+        tensor = Tensor([1, 2, 3])
+        result = tensor * 2
+        expected_data = [2, 4, 6]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_elementwise_multiplication(self):
+        # Test elementwise multiplication of two tensors
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        result = tensor1 * tensor2
+        expected_data = [4, 10, 18]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_scalar_multiplication(self):
+        # Test reverse scalar multiplication
+        tensor = Tensor([1, 2, 3])
+        result = 2 * tensor
+        expected_data = [2, 4, 6]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_elementwise_multiplication(self):
+        # Test reverse elementwise multiplication of two tensors
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        result = tensor2 * tensor1
+        expected_data = [4, 10, 18]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_imul_scalar(self):
+        # Test in-place multiplication of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        tensor *= 2
+        expected_data = [2, 4, 6]
+        self.assertTrue(tensor._storage.eq(Tensor(expected_data)._storage))
+
+    def test_imul_tensor(self):
+        # Test in-place multiplication of tensor with another tensor
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        tensor1 *= tensor2
+        expected_data = [4, 10, 18]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+    def test_truediv_scalar(self):
+        # Test division of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        result = tensor / 2
+        expected_data = [0.5, 1.0, 1.5]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_truediv_tensor(self):
+        # Test division of two tensors
+        tensor1 = Tensor([4, 5, 6])
+        tensor2 = Tensor([2, 2, 2])
+        result = tensor1 / tensor2
+        expected_data = [2.0, 2.5, 3.0]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_truediv_scalar(self):
+        # Test reverse division of scalar with a tensor
+        tensor = Tensor([2, 4, 6])
+        result = 10 / tensor
+        expected_data = [5.0, 2.5, 1.6666666666666667]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_truediv_tensor(self):
+        # Test reverse division of tensor with another tensor
+        tensor1 = Tensor([10, 20, 30])
+        tensor2 = Tensor([2, 4, 6])
+        result = tensor2 / tensor1
+        expected_data = [0.2, 0.2, 0.2]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_itruediv_scalar(self):
+        # Test in-place division of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        tensor /= 2
+        expected_data = [0.5, 1.0, 1.5]
+        self.assertTrue(tensor._storage.eq(Tensor(expected_data)._storage))
+
+    def test_itruediv_tensor(self):
+        # Test in-place division of tensor with another tensor
+        tensor1 = Tensor([4, 6, 8])
+        tensor2 = Tensor([2, 3, 4])
+        tensor1 /= tensor2
+        expected_data = [2.0, 2.0, 2.0]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+    def test_scalar_power(self):
+        # Test power of tensor with a scalar
+        tensor = Tensor([1, 2, 3])
+        result = tensor ** 2
+        expected_data = [1, 4, 9]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_tensor_power(self):
+        # Test power of two tensors
+        tensor1 = Tensor([2, 3, 4])
+        tensor2 = Tensor([2, 2, 2])
+        result = tensor1 ** tensor2
+        expected_data = [4, 9, 16]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_scalar_power(self):
+        # Test reverse power of scalar with a tensor
+        tensor = Tensor([2, 3, 4])
+        result = 2 ** tensor
+        expected_data = [4, 8, 16]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_reverse_tensor_power(self):
+        # Test reverse power of tensor with another tensor
+        tensor1 = Tensor([2, 3, 4])
+        tensor2 = Tensor([2, 2, 2])
+        result = tensor2 ** tensor1
+        expected_data = [4, 8, 16]
+        self.assertTrue(result._storage.eq(Tensor(expected_data)._storage))
+
+    def test_ipow_scalar(self):
+        # Test in-place exponentiation with a scalar
+        tensor = Tensor([2, 3, 4])
+        tensor **= 2
+        expected_data = [4, 9, 16]
+        self.assertTrue(tensor._storage.eq(Tensor(expected_data)._storage))
+
+    def test_ipow_tensor(self):
+        # Test in-place exponentiation with another tensor
+        tensor1 = Tensor([2, 3, 4])
+        tensor2 = Tensor([2, 2, 2])
+        tensor1 **= tensor2
+        expected_data = [4, 9, 16]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+    def test_matmul(self):
+        # Test matrix multiplication of two tensors
+        tensor1 = Tensor([[1, 2], [3, 4]])
+        tensor2 = Tensor([[5, 6], [7, 8]])
+        result = tensor1 @ tensor2
+        expected_data = [[19, 22], [43, 50]]
+        self.assertTrue(result._storage.eq(Storage(expected_data)))
+
+    def test_imatmul(self):
+        # Test matrix multiplication with in-place assignment
+        tensor1 = Tensor([[1, 2], [3, 4]])
+        tensor2 = Tensor([[5, 6], [7, 8]])
+        tensor1 @= tensor2
+        expected_data = [[19, 22], [43, 50]]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+        # Test matrix multiplication with in-place assignment and broadcasting
+        tensor1 = Tensor([1, 2])
+        tensor2 = Tensor([[3, 4], [5, 6]])
+        tensor1 @= tensor2
+        expected_data = [13, 16]
+        self.assertTrue(tensor1._storage.eq(Tensor(expected_data)._storage))
+
+    def test_exp(self):
+        # Test case 1: exp of a positive number
+        x = Tensor(2)
+        result = x.exp()
+        expected_result = Tensor(7.3890560989306495)
+        self.assertTrue(result._storage.eq(expected_result._storage))
+
+        # Test case 2: exp of a negative number
+        x = Tensor(-2)
+        result = x.exp()
+        expected_result = Tensor(0.1353352832366127)
+        self.assertTrue(result._storage.eq(expected_result._storage))
+
+        # Test case 3: exp of zero
+        x = Tensor(0)
+        result = x.exp()
+        expected_result = Tensor(1)
+        self.assertTrue(result._storage.eq(expected_result._storage))
+
+    def test_sqrt(self):
+        # Test case 1: sqrt of a positive number
+        x = Tensor(4)
+        result = x.sqrt()
+        expected_result = Tensor(2)
+        self.assertTrue(result._storage.eq(expected_result._storage))
+
+        # Test case 2: sqrt of a negative number
+        # x = Tensor(-4)
+        # result = x.sqrt()
+        # expected_result = Tensor(float('nan'))
+        # self.assertFalse(result._storage.eq(result._storage))  # Check for NaN
+
+        # Test case 3: sqrt of zero
+        x = Tensor(0)
+        result = x.sqrt()
+        expected_result = Tensor(0)
+        self.assertTrue(result._storage.eq(expected_result._storage))    
     
-    def test_tensor_masked_fill(self):
-        old = Tensor([[ 0.7,  3.2, 1.1], 
-                      [ 3.2, -3.9, 0.2], 
-                      [-1.5,  3.2, 3.2]])
-
-        new = old.masked_fill(old == 3.2, 1.7)
-
-        # Check dims
-        self.assertEqual(new.shape[0], 3)
-        self.assertEqual(new.shape[1], 3)
-        
-        # Check data
-        for o, n in zip(old._np.flatten().tolist(), new._np.flatten().tolist()):
-            if o == 3.2:
-                self.assertEqual(n, 1.7)
-
-    def test_tensor_replace(self):
-        old = Tensor([[ 0.7,  3.2, 1.1], 
-                      [ 3.2, -3.9, 0.2], 
-                      [-1.5,  3.2, 3.2]])
-
-        new = old.replace(3.2, 1.7)
-
-        # Check dims
-        self.assertEqual(new.shape[0], 3)
-        self.assertEqual(new.shape[1], 3)
-
-        # Check data
-        for o, n in zip(old._np.flatten().tolist(), new._np.flatten().tolist()):
-            if o == 3.2:
-                self.assertEqual(n, 1.7)
-
-    def test_tensor_tril_main_diagonal(self):
-        old = Tensor([[ 0.7,  3.2, 1.1], 
-                      [ 3.2, -3.9, 0.2], 
-                      [-1.5,  3.2, 3.2]])
-
-        new = Tensor.tril(old)
-        expected_new = Tensor([[ 0.7,  0.0, 0.0], 
-                               [ 3.2, -3.9, 0.0], 
-                               [-1.5,  3.2, 3.2]])
-
-        # Check dims
-        self.assertEqual(new.shape[0], 3)
-        self.assertEqual(new.shape[1], 3)
-        
-        # Check data
-        for new_row, expected_new_row in zip(new.data, expected_new.data):
-            for new_value, expected_new_value in zip(new_row, expected_new_row):
-                self.assertAlmostEqual(new_value, expected_new_value)
-
-#     def test_tensor_tril_anti_diagonal(self):
-#         old = Tensor([[ 0.7,  3.2, 1.1], 
-#                       [ 3.2, -3.9, 0.2], 
-#                       [-1.5,  3.2, 3.2]])
-
-#         new = Tensor.tril(old, Tensor.Diagonal.ANTI)
-#         expected_new = Tensor([[0.7,  3.2, 1.1], 
-#                                [0.0, -3.9, 0.2], 
-#                                [0.0,  0.0, 3.2]])
-#         # Check dims
-#         self.assertEqual(new.shape[0], 3)
-#         self.assertEqual(new.shape[1], 3)
-        
-#         # Check data
-#         for new_row, expected_new_row in zip(new.data, expected_new.data):
-#             for new_value, expected_new_value in zip(new_row, expected_new_row):
-#                 self.assertAlmostEqual(new_value, expected_new_value)
-
-# class TestBinaryOps(unittest.TestCase):
-#     def test_tensor_is_equal_to_tensor(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3], 
-#                     [2.1,  1.4,  0.8]])
-        
-#         b = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3], 
-#                     [2.1,  1.4,  0.8]])
-        
-#         self.assertEqual(a == b, True)
-        
-#     def test_tensor_is_elementwise_equal_to_float(self):
-#         a = Tensor([[ 0.7,  3.2, 1.1],  
-#                     [-1.5,  3.2, 3.2]])
-        
-#         target = 3.2
-
-#         result = a == target
-#         expected_result = [[False, True , False],
-#                            [False, True , True ],]
-        
-#         # Check result
-#         for res_row, exp_res_row in zip(result, expected_result):
-#             for res_val, exp_res_val in zip(res_row, exp_res_row):
-#                 self.assertEqual(res_val, exp_res_val) 
-
-#     def test_add_two_tensor_objects(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3], 
-#                     [2.1,  1.4,  0.8]])
-        
-#         b = Tensor([[ 0.8,  1.4, 2.1], 
-#                     [ 2.3, -0.5, 1.2], 
-#                     [-1.8,  2.4, 3.0]])
-        
-#         result = a + b
-
-#         # Check result
-#         expected_result = Tensor([[ 3.8,  3.8, 0.3], 
-#                                   [ 3.5, -1.0, 3.5], 
-#                                   [ 0.3,  3.8, 3.8]])
-
-#         rows, cols = result.shape[0], result.shape[1]
-#         for row in range(rows):
-#             for col in range(cols):
-#                 self.assertAlmostEqual(result[row][col], expected_result[row][col])
-
-#     def test_multiply_tensor_and_float(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3], 
-#                     [2.1,  1.4,  0.8]])
-        
-#         b = 1.7
-
-#         result = a * b
-
-#         # Check result
-#         expected_result = Tensor([[3.0 * 1.7,  2.4 * 1.7, -1.8 * 1.7], 
-#                                   [1.2 * 1.7, -0.5 * 1.7,  2.3 * 1.7], 
-#                                   [2.1 * 1.7,  1.4 * 1.7,  0.8 * 1.7]])
-
-#         rows, cols = result.shape[0], result.shape[1]
-#         for row in range(rows):
-#             for col in range(cols):
-#                 self.assertAlmostEqual(result[row][col], expected_result[row][col])
-
-#     def test_multiply_float_and_tensor(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                                   [1.2, -0.5,  2.3], 
-#                                   [2.1,  1.4,  0.8]])
-        
-#         b = 1.7
-
-#         result = b * a
-
-#         # Check result
-#         expected_result = Tensor([[3.0 * 1.7,  2.4 * 1.7, -1.8 * 1.7], 
-#                                   [1.2 * 1.7, -0.5 * 1.7,  2.3 * 1.7], 
-#                                   [2.1 * 1.7,  1.4 * 1.7,  0.8 * 1.7]])
-
-#         rows, cols = result.shape[0], result.shape[1]
-#         for row in range(rows):
-#             for col in range(cols):
-#                 self.assertAlmostEqual(result[row][col], expected_result[row][col])
-
-#     def test_divide_tensor_and_float(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3], 
-#                     [2.1,  1.4,  0.8]])
-        
-#         b = 1.7
-
-#         result = a / b
-
-#         # Check result
-#         expected_result = Tensor([[3.0 / 1.7,  2.4 / 1.7, -1.8 / 1.7], 
-#                                   [1.2 / 1.7, -0.5 / 1.7,  2.3 / 1.7], 
-#                                   [2.1 / 1.7,  1.4 / 1.7,  0.8 / 1.7]])
-
-#         rows, cols = result.shape[0], result.shape[1]
-#         for row in range(rows):
-#             for col in range(cols):
-#                 self.assertAlmostEqual(result[row][col], expected_result[row][col])
-
-#     def test_tensor_matmul_product(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3], 
-#                     [2.1,  1.4,  0.8]])
-        
-#         b = Tensor([[0.8],  [1.4], [2.1]])
-        
-#         result = a.matmul(b)
-        
-#         # Check shape
-#         self.assertEqual(a.shape[0], result.shape[0])
-#         self.assertEqual(b.shape[1], result.shape[1])
-
-#         # Check result
-#         expected_result = Tensor([[1.98], [5.09], [5.32]])
-
-#         rows, cols = result.shape[0], result.shape[1]
-#         for row in range(rows):
-#             for col in range(cols):
-#                 self.assertAlmostEqual(result[row][col], expected_result[row][col])
-
-# class TestUnaryOps(unittest.TestCase):
-#     def test_tensor_transpose(self):
-#         a = Tensor([[3.0,  2.4, -1.8], 
-#                     [1.2, -0.5,  2.3]])
-        
-#         result = a.T
-
-#         # Check shape
-#         self.assertEqual(a.shape[0], result.shape[1])
-#         self.assertEqual(a.shape[1], result.shape[0])
-
-#         # Check result
-#         expected_result = Tensor([[ 3.0,  1.2],
-#                                   [ 2.4, -0.5],
-#                                   [-1.8,  2.3]])
-
-#         rows, cols = result.shape[0], result.shape[1]
-#         for row in range(rows):
-#             for col in range(cols):
-#                 self.assertAlmostEqual(result[row][col], expected_result[row][col])
-
-#     def test_tensor_flatten(self):
-#         old = Tensor([[ 0.7,  3.2, 1.1], 
-#                       [ 3.2, -3.9, 0.2], 
-#                       [-1.5,  3.2, 3.2]])
-        
-#         new = old.flatten()
-#         print(new.shape)
-#         expected_new = Tensor([0.7,  3.2, 1.1, 3.2, -3.9, 0.2, -1.5,  3.2, 3.2])
-
-#         # Check dims
-#         self.assertEqual(new.shape[0], (old.shape[0] * old.shape[1]))
-        
-#         # Check data
-#         for new_row, expected_new_row in zip(new.data, expected_new.data):
-#             for new_value, expected_new_value in zip(new_row, expected_new_row):
-#                 self.assertAlmostEqual(new_value, expected_new_value)
-
-#     def test_tensor_sum_dim_not_specified(self):
-#         old = Tensor([[ 0.7,  3.2, 1.1], 
-#                       [ 3.2, -3.9, 0.2], 
-#                       [-1.5,  3.2, 3.2]])
-        
-#         result = old.sum()
-#         expected_result = sum([*old.flatten().data])
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], 1)
-        
-#         # Check data
-#         self.assertAlmostEqual(result.item(), expected_result, delta=0.00001)
-
-#     def test_tensor_sum_dim_0(self):
-#         old = Tensor([[ 0.7,  3.2, 1.1], 
-#                       [ 3.2, -3.9, 0.2], 
-#                       [-1.5,  3.2, 3.2]])
-        
-#         result = old.sum(axis=0)
-#         expected_result = Tensor([sum(row) for row in old.T.data])
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], 3)
-#         self.assertEqual(result.shape[1], 1)
-        
-#         # Check data
-#         for result_row, expected_result_row in zip(result.data, expected_result.data):
-#             for result_value, expected_result_value in zip(result_row, expected_result_row):
-#                 self.assertAlmostEqual(result_value, expected_result_value)
-
-#     def test_tensor_sum_dim_1(self):
-#         data = [[ 0.7,  3.2, 1.1], 
-#                 [ 3.2, -3.9, 0.2], 
-#                 [-1.5,  3.2, 3.2]]
-#         old = Tensor(data)
-        
-#         result = old.sum(axis=1)
-#         expected_result = Tensor([sum(row) for row in data])
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], 3)
-        
-#         # Check data
-#         for result_row, expected_result_row in zip([result.data], [expected_result.data]):
-#             for result_value, expected_result_value in zip(result_row, expected_result_row):
-#                 self.assertAlmostEqual(result_value, expected_result_value, delta=0.000001)
-
-#     def test_tensor_exp(self):
-#         input = Tensor([[ 0.7,  3.2, 1.1], 
-#                         [ 3.2, -3.9, 0.2], 
-#                         [-1.5,  3.2, 3.2]])
-        
-#         result = input.exp()
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], input.shape[0])
-#         self.assertEqual(result.shape[1], input.shape[1])
-        
-#         # Check data
-#         for input_row, result_row in zip(input.data, result.data):
-#             for input_value, result_value in zip(input_row, result_row):
-#                 self.assertAlmostEqual(math.e ** input_value, result_value)
-
-#     def test_tensor_log_base_2(self):
-#         input = Tensor([[0.7, 3.2, 1.1], 
-#                                       [3.2, 3.9, 0.2], 
-#                                       [1.5, 3.2, 3.2]])
-        
-#         result = input.log(2)
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], input.shape[0])
-#         self.assertEqual(result.shape[1], input.shape[1])
-        
-#         # Check data
-#         for input_row, result_row in zip(input.data, result.data):
-#             for input_value, result_value in zip(input_row, result_row):
-#                 self.assertAlmostEqual(math.log(input_value, 2), result_value)
-
-#     def test_tensor_log_base_e(self):
-#         input = Tensor([[0.7, 3.2, 1.1], 
-#                                       [3.2, 3.9, 0.2], 
-#                                       [1.5, 3.2, 3.2]])
-        
-#         result = input.log(math.e)
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], input.shape[0])
-#         self.assertEqual(result.shape[1], input.shape[1])
-        
-#         # Check data
-#         for input_row, result_row in zip(input.data, result.data):
-#             for input_value, result_value in zip(input_row, result_row):
-#                 self.assertAlmostEqual(math.log(input_value, math.e), result_value)
-
-#     def test_tensor_sigmoid(self):
-#         input = Tensor([[ 0.7,  3.2, 1.1], 
-#                         [ 3.2, -3.9, 0.2], 
-#                         [-1.5,  3.2, 3.2]])
-        
-#         result = input.sigmoid()
-#         expected_result = Tensor([[ 0.66818777, 0.96083427, 0.750260105], 
-#                                   [ 0.96083427, 0.01984030, 0.549833997], 
-#                                   [ 0.18242552, 0.96083427, 0.96083427]])
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], input.shape[0])
-#         self.assertEqual(result.shape[1], input.shape[1])
-        
-#         # Check data
-#         for result_row, expected_result_row in zip(result.data, expected_result.data):
-#             for result_value, expected_result_value in zip(result_row, expected_result_row):
-#                 self.assertAlmostEqual(result_value, expected_result_value)
-
-#     def test_tensor_relu(self):
-#         input = Tensor([[ 0.7,  3.2, 1.1], 
-#                         [ 3.2, -3.9, 0.2], 
-#                         [-1.5,  3.2, 3.2]])
-        
-#         result = input.relu()
-#         expected_result = Tensor([[ 0.7,  3.2, 1.1], 
-#                                   [ 3.2,  0.0, 0.2], 
-#                                   [ 0.0,  3.2, 3.2]])
-
-#         # Check dims
-#         self.assertEqual(result.shape[0], input.shape[0])
-#         self.assertEqual(result.shape[1], input.shape[1])
-        
-#         # Check data
-#         for result_row, expected_result_row in zip(result.data, expected_result.data):
-#             for result_value, expected_result_value in zip(result_row, expected_result_row):
-#                 self.assertAlmostEqual(result_value, expected_result_value)
-
-    # def test_tensor_tanh(self):
-    #     input = tensor([[ 0.7,  3.2, 1.1], 
-    #                                   [ 3.2, -3.9, 0.2], 
-    #                                   [-1.5,  3.2, 3.2]])
-        
-    #     result = input.tanh()
-
-    #     # Check dims
-    #     self.assertEqual(result.shape[0], input.shape[0])
-    #     self.assertEqual(result.shape[1], input.shape[1])
-        
-    #     # Check data
-    #     for input_row, result_row in zip(input.data, result.data):
-    #         for input_value, result_value in zip(input_row, result_row):
-    #             self.assertAlmostEqual(input_value.tanh().data, result_value.data)
-
-    # def test_tensor_softmax_dim_0(self):
-    #     input = tensor([[ 0.7,  3.2, 1.1], 
-    #                                   [ 3.2, -3.9, 0.2], 
-    #                                   [-1.5,  3.2, 3.2]])
-        
-    #     result = input.softmax(dim=0)
-    #     expected_result = tensor([[0.0752258819, 0.4997938080, 0.104463303],
-    #                                             [0.9164388527, 0.0004123823, 0.0424716097],
-    #                                             [0.0083352653, 0.4997938088, 0.8530650866]])
-    #     # Check dims
-    #     self.assertEqual(result.shape[0], input.shape[0])
-    #     self.assertEqual(result.shape[1], input.shape[1])
-        
-    #     # Check data
-    #     for result_row, expected_row in zip(result.data, expected_result.data):
-    #         for result_value, expected_value in zip(result_row, expected_row):
-    #             self.assertAlmostEqual(result_value.data, expected_value.data)
-
-    # def test_tensor_softmax_dim_1(self):
-    #     input = tensor([[ 0.7,  3.2, 1.1], 
-    #                                   [ 3.2, -3.9, 0.2], 
-    #                                   [-1.5,  3.2, 3.2]])
-        
-    #     result = input.softmax(dim=1)
-    #     expected_result = tensor([[0.06814626, 0.83019145, 0.101662280],
-    #                                             [0.951826016, 7.8536e-04, 0.0473886269],
-    #                                             [4.5271e-03, 0.497736474, 0.4977364744]])
-    #     # Check dims
-    #     self.assertEqual(result.shape[0], input.shape[0])
-    #     self.assertEqual(result.shape[1], input.shape[1])
-        
-    #     # Check data
-    #     for result_row, expected_row in zip(result.data, expected_result.data):
-    #         for result_value, expected_value in zip(result_row, expected_row):
-    #             self.assertAlmostEqual(result_value.data, expected_value.data)
-
-    # def test_tensor_softmax_dim_1(self):
-    #     input = tensor([[ 0.7,  3.2, 1.1], 
-    #                                   [ 3.2, -3.9, 0.2], 
-    #                                   [-1.5,  3.2, 3.2]])
-        
-    #     result = input.softmax(dim=1)
-    #     expected_result = tensor([[0.06814626, 0.83019145, 0.101662280],
-    #                                             [0.951826016, 7.8536e-04, 0.0473886269],
-    #                                             [4.5271e-03, 0.497736474, 0.4977364744]])
-        
-    #     # Check dims
-    #     self.assertEqual(result.shape[0], input.shape[0])
-    #     self.assertEqual(result.shape[1], input.shape[1])
-        
-    #     # Check data
-    #     for result_row, expected_row in zip(result.data, expected_result.data):
-    #         for result_value, expected_value in zip(result_row, expected_row):
-    #             self.assertAlmostEqual(result_value.data, expected_value.data)
-
-    # def test_tensor_cross_entropy(self):
-    #     input = tensor([[0.7, 0.2, 0.1], 
-    #                                   [0.5, 0.25, 0.25], 
-    #                                   [0.95, 0.01, 0.04]])
-
-    #     target = tensor([[0, 1, 0], 
-    #                                    [1, 0, 0], 
-    #                                    [1, 0, 0]])
-        
-    #     result = input.cross_entropy(target)
-    #     expected_result = tensor.from_1d_array([2.321928094, 1.0000, 0.07400058144])
-        
-    #     # Check dims
-    #     self.assertEqual(result.shape[0], 1)
-    #     self.assertEqual(result.shape[1], input.shape[1])
-
-    #     # Check data
-    #     for result_row, expected_row in zip(result.data, expected_result.data):
-    #         for result_value, expected_value in zip(result_row, expected_row):
-    #             self.assertAlmostEqual(result_value.data, expected_value.data)
-
-    # def test_tensor_mse(self):
-    #     input = tensor([[2, 2, 3], 
-    #                                   [5, 1, 0], 
-    #                                   [1, 2, 3]])
-
-    #     target = tensor([[0, 1, 0], 
-    #                                    [1, 0, 0], 
-    #                                    [1, 0, 0]])
-        
-    #     result = input.MSE(target)
-    #     expected_result = tensor.from_1d_array([4.666666666, 5.666666666, 4.33333333])
-        
-    #     # Check dims
-    #     self.assertEqual(result.shape[0], 1)
-    #     self.assertEqual(result.shape[1], input.shape[1])
-
-    #     # Check data
-    #     for result_row, expected_row in zip(result.data, expected_result.data):
-    #         for result_value, expected_value in zip(result_row, expected_row):
-    #             self.assertAlmostEqual(result_value.data, expected_value.data)
-
-if __name__ == "__main__":
+    def test_where(self):
+        # Test case 1: Condition is True
+        condition = Tensor([True, True, True])
+        x = Tensor([1, 2, 3])
+        y = Tensor([4, 5, 6])
+        result = condition.where(x, y)
+        expected_result = Tensor([1, 2, 3])
+        self.assertTrue(result._storage.eq(expected_result._storage))
+
+        # Test case 2: Condition is False
+        condition = Tensor([False, False, False])
+        x = Tensor([1, 2, 3])
+        y = Tensor([4, 5, 6])
+        result = condition.where(x, y)
+        expected_result = Tensor([4, 5, 6])
+        self.assertTrue(result._storage.eq(expected_result._storage))
+
+        # Test case 3: Condition is a Tensor with different shape
+        condition = Tensor([True, False])
+        x = Tensor([1, 2, 3])
+        y = Tensor([4, 5, 6])
+        try:
+            result = condition.where(x, y)
+            expected_result = Tensor([1, 5, 6])
+            self.assertTrue(result._storage.eq(expected_result._storage))
+        except ValueError as e:
+            self.assertEqual(str(e), \
+                f"operands could not be broadcast together with remapped shapes [original->remapped]: {condition.shape}  and requested shape {x.shape}")
+
+    def test_sigmoid(self):
+        # Test sigmoid function
+        x = Tensor([-10, -5, 0, 5, 10], dtype=Tensor.Dtype.Float)
+        result = x.sigmoid()
+        expected_result = Tensor([0.00004539, 0.00669285, 0.5, 0.99330715, 0.99995460])
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+    def test_tanh(self):
+        # Test tanh function
+        x = Tensor([-10, -5, 0, 5, 10], dtype=Tensor.Dtype.Float)
+        result = x.tanh()
+        expected_result = Tensor([-1.00000000, -0.99990920, 0.00000000, 0.99990920, 1.00000000])
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+    def test_relu(self):
+        # Test relu function
+        x = Tensor([-10, -5, 0, 5, 10], dtype=Tensor.Dtype.Float)
+        result = x.relu()
+        expected_result = Tensor([0, 0, 0, 5, 10])
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+    def test_softmax(self):
+        # Test softmax function
+        x = Tensor([1, 2, 3, 4, 5], dtype=Tensor.Dtype.Float)
+        result = x.softmax()
+        expected_result = Tensor([0.01165623, 0.03168492, 0.08612854, 0.23412166, 0.63640865])
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+    def test_MSE(self):
+        # Test case 1: MSE of two tensors
+        tensor1 = Tensor([1, 2, 3])
+        tensor2 = Tensor([4, 5, 6])
+        result = tensor1.MSE(tensor2)
+        expected_result = Tensor(9)
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+        # Test case 2: MSE of two tensors with axis
+        tensor1 = Tensor([[1, 2, 3], [4, 5, 6]])
+        tensor2 = Tensor([[4, 5, 6], [1, 2, 3]])
+        result = tensor1.MSE(tensor2, axis=1)
+        expected_result = Tensor([9, 9])
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+    def test_cross_entropy(self):
+        # Test case 1: Cross entropy of two tensors
+        tensor1 = Tensor([0.2, 0.3, 0.5])
+        tensor2 = Tensor([0.3, 0.3, 0.4])
+        result = tensor1.cross_entropy(tensor2)
+        expected_result = Tensor(1.12128209)
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+        # Test case 2: Cross entropy of two tensors with axis
+        tensor1 = Tensor([[0.2, 0.3, 0.5], [0.4, 0.3, 0.3]])
+        tensor2 = Tensor([[0.3, 0.3, 0.4], [0.3, 0.4, 0.3]])
+        result = tensor1.cross_entropy(tensor2, axis=1)
+        expected_result = Tensor([1.12128209, 1.11766818])
+        self.assertTrue(result._storage.all_close(expected_result._storage))
+
+    def test_broadcasted(self):
+        # Test case 1: Same shape tensors
+        x = Tensor([1, 2, 3])
+        y = Tensor([4, 5, 6])
+        result_x, result_y = x._broadcasted(y)
+        self.assertTrue(result_x._storage.eq(x._storage))
+        self.assertTrue(result_y._storage.eq(y._storage))
+
+        # Test case 2: Different shape tensors
+        x = Tensor([[1, 2, 3], [4, 5, 6]])
+        y = Tensor([7, 8, 9])
+        result_x, result_y = x._broadcasted(y)
+        expected_x = Tensor([[1, 2, 3], [4, 5, 6]])
+        expected_y = Tensor([[7, 8, 9], [7, 8, 9]])
+        self.assertTrue(result_x._storage.eq(expected_x._storage))
+        self.assertTrue(result_y._storage.eq(expected_y._storage))
+
+        # Test case 3: Broadcasting with scalar tensor
+        x = Tensor([1, 2, 3])
+        y = Tensor(4)
+        result_x, result_y = x._broadcasted(y)
+        expected_x = Tensor([1, 2, 3])
+        expected_y = Tensor([4, 4, 4])
+        self.assertTrue(result_x._storage.eq(expected_x._storage))
+        self.assertTrue(result_y._storage.eq(expected_y._storage))
+    
+    def test_getitem_single_index(self):
+        # Test getting a single element from a 1D tensor
+        tensor = Tensor([1, 2, 3, 4, 5])
+        self.assertEqual(tensor[2], 3)
+
+    def test_getitem_slice(self):
+        # Test getting a slice from a 1D tensor
+        tensor = Tensor([1, 2, 3, 4, 5])
+        self.assertEqual(tensor[1:4], Tensor([2, 3, 4]))
+
+    def test_getitem_ellipsis(self):
+        # Test using ellipsis to select all elements
+        tensor = Tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        self.assertEqual(tensor[..., 1], Tensor([2, 5, 8]))
+
+    def test_getitem_negative_indices(self):
+        # Test using negative indices to select elements from the end
+        tensor = Tensor([1, 2, 3, 4, 5])
+        self.assertEqual(tensor[-3:-1], Tensor([3, 4]))
+
+    def test_getitem_strides(self):
+        # Test using strides to select elements with a step
+        tensor = Tensor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual(tensor[1:9:2], Tensor([2, 4, 6, 8]))
+
+    def test_getitem_tensor(self):
+        # Test using strides to select elements with a step
+        tensor = Tensor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        idx = Tensor([0, 4, 7, 9])
+        self.assertTrue(tensor[idx]._storage.eq(Tensor([1, 5, 8, 10])._storage))
+
+if __name__ == '__main__':
     unittest.main()
-class TestTensorGenerationFuncs(unittest.TestCase):
-    def test_tensor_full(self):
-        a = Tensor.full((3, 2), 1.3)
-
-        # Check dims
-        self.assertEqual(a.shape[0], 3)
-        self.assertEqual(a.shape[1], 2)
-
-        # Check data
-        self.assertTrue(all((a == 1.3)._np.flatten().tolist()))

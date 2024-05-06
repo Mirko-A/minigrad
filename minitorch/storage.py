@@ -169,6 +169,12 @@ class Storage:
     def eq(self, other: Storage) -> bool:
         return np.array_equal(self._np, other._np)
     
+    def all_close(self, other: Storage, equal_nan: bool = False) -> bool:
+        return np.allclose(self._np, other._np, equal_nan=equal_nan)
+
+    def is_close(self, other: Storage, equal_nan: bool = False) -> bool:
+        return Storage(np.isclose(self._np, other._np, equal_nan=equal_nan))
+    
     def is_scalar(self) -> bool:
         return self.shape == ()
     

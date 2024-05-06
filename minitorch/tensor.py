@@ -9,7 +9,6 @@ import math
 
 from minitorch.storage import Storage
 from minitorch import helpers
-from minitorch.settings import DEBUG
 
 class Function:
     def __init__(self, *inputs: Tensor):
@@ -25,7 +24,7 @@ class Function:
     def apply(fn_ctor: Type[Function], *inputs: Tensor, **kwargs) -> Tensor: 
         # fn_ctor is the constructor of the child class from which 'apply' is called
         ctx = fn_ctor(*inputs)
-        result = Tensor(ctx.forward(*[input._data for input in inputs], **kwargs), requires_grad=ctx.output_requires_grad)
+        result = Tensor(ctx.forward(*[input._storage for input in inputs], **kwargs), requires_grad=ctx.output_requires_grad)
         
         # Keep the reference to the function which created the result
         # Used for autograd
@@ -41,14 +40,14 @@ class Tensor:
     ArrayLike = Storage.ArrayLike
     Dtype = Storage.Dtype
     
-    __slots__ = ("_data", "requires_grad", "grad", "_ctx")
+    __slots__ = ("_storage", "requires_grad", "grad", "_ctx")
     __deletable__ = ("_ctx",)
 
-    def __init__(self, data: Value | ArrayLike, dtype: Optional[Dtype] = None, requires_grad: bool = False):
+    def __init__(self, data: Value | ArrayLike | Storage, dtype: Optional[Dtype] = None, requires_grad: bool = False):
         if isinstance(data, Storage):
-            self._data = data
+            self._storage = data
         else:
-            self._data = Storage(data, dtype)
+            self._storage = Storage(data, dtype)
             
         self.requires_grad = requires_grad
         self.grad: Optional[Tensor] = None
@@ -57,11 +56,11 @@ class Tensor:
 
     @property
     def _np(self):
-        return self._data._np
+        return self._storage._np
 
     @property
     def shape(self):
-        return self._data.shape
+        return self._storage.shape
 
     @property
     def ndim(self):
@@ -69,9 +68,8 @@ class Tensor:
 
     @property
     def dtype(self):
-        return self._data.dtype
+        return self._storage.dtype
 
-    # TODO
     @property
     def T(self) -> Tensor:
         return self.transpose()
@@ -124,18 +122,19 @@ class Tensor:
         return (old == target).where(new, old)
 
     @staticmethod
-    def _tri(r: int, c: int, k: int=0, dtype: Optional[Dtype] = None, requires_grad: bool = False) -> Tensor: 
-        return Tensor.arange(r, dtype=dtype, requires_grad=requires_grad).unsqueeze(1).expand((r,c)) <= Tensor.arange(-k, c-k, dtype=dtype, requires_grad=requires_grad).unsqueeze(0).expand((r,c))
+    def _tri(row: int, col: int, offset: int=0, dtype: Optional[Dtype] = None, requires_grad: bool = False) -> Tensor: 
+        tri_mask = (Tensor.arange(row, dtype=dtype, requires_grad=requires_grad).unsqueeze(1).expand((row,col)) > Tensor.arange(-offset, col-offset, dtype=dtype, requires_grad=requires_grad).unsqueeze(0).expand((row,col)))
+        return tri_mask.where(Tensor(1), Tensor(0))
     
     def triu(self, k: int=0) -> Tensor:
         assert helpers.all_int(self.shape), f"does not support symbolic shape {self.shape}"
 
-        return Tensor._tri(self.shape[-2], self.shape[-1], k=k, dtype=self.dtype).where(self, Tensor.full_like(self, 0.0))
+        return Tensor._tri(self.shape[-2], self.shape[-1], offset=k, dtype=self.dtype).where(self, Tensor.full_like(self, 0.0))
 
     def tril(self, k: int=0) -> Tensor:
         assert helpers.all_int(self.shape), f"does not support symbolic shape {self.shape}"
 
-        return Tensor._tri(self.shape[-2], self.shape[-1], k=k+1, dtype=self.dtype).where(Tensor.full_like(self, 0.0), self)
+        return Tensor._tri(self.shape[-2], self.shape[-1], offset=k+1, dtype=self.dtype).where(Tensor.full_like(self, 0.0), self)
 
     def cat(self, others: list[Tensor], axis: int = 0) -> Tensor:
         axis = (axis + len(self.shape)) if axis < 0 else axis
@@ -278,7 +277,7 @@ class Tensor:
     def multinomial(self, num_samples: int = 1, replacement: bool = False) -> Tensor:
         assert all(helpers.float_equal(s, 1.0) for s in self.sum(axis=-1).data), \
             "Cannot perform multinomial, Tensor rows must be probability distributions."
-        return Tensor(cpp.MiniBuffer.multinomial(self._data, num_samples, replacement), self.requires_grad)
+        return Tensor(cpp.MiniBuffer.multinomial(self._storage, num_samples, replacement), self.requires_grad)
 
     #* Binary operations
 
@@ -332,8 +331,8 @@ class Tensor:
         x, y = self, other
         n1, n2 = len(x.shape), len(y.shape)
         
-        assert n1 != 0 and n2 != 0, \
-            f"Both arguments to matmul need to be at least 1D, but they are {n1}D and {n2}D."
+        assert n1 >= 1 and n2 >= 2, \
+            f"Both arguments to matmul need to be at least 1D @ 2D, but they are {n1}D and {n2}D."
         assert x.shape[-1] == y.shape[-2], \
             f"Input Tensor shapes {x.shape} and {y.shape} cannot be multiplied ({x.shape[-1]} != {y.shape[-2]})"
         
@@ -376,6 +375,17 @@ class Tensor:
         self_exp = self.exp()
 
         return self_exp / self_exp.sum(axis, keepdims=True)
+
+    #* Math functions
+    
+    def abs(self): 
+        return self.relu() + (-self).relu()
+
+    def sign(self): 
+        return self / (self.abs() + 1e-10)
+
+    def reciprocal(self): 
+        return 1.0/self
 
     #* Cost functions
 
@@ -420,7 +430,7 @@ class Tensor:
         for node in autograd_graph:
             assert node.grad is not None
 
-            grads = node._ctx.backward(node.grad._data)
+            grads = node._ctx.backward(node.grad._storage)
             grads = [Tensor(g, requires_grad=False) if g is not None else None
                         for g in ([grads] if len(node._ctx.parents) == 1 else grads)]
             
@@ -463,15 +473,13 @@ class Tensor:
     def __neg__(self) -> Tensor:
         return self.neg()
 
-    def __getitem__(self, keys) -> Tensor:
+    def __getitem__(self, keys) -> Tensor: # keys: Union[int, slice, Tensor, None, Ellipsis, Tuple[Union[int, slice, Tensor, None, Ellipsis], ...]]
         def normalize_int(e: int, i: int, dim_sz: int) -> int:
             if -dim_sz <= e < dim_sz: 
                 return e if e != -1 else dim_sz-1
             assert False, \
                 f"Index {e} is out of bounds for dimension {i} with size {self.shape[i]}"
 
-        # Convert keys to list
-        orig_slices = list(keys) if isinstance(keys, tuple) else [keys]
 
         def normalize_slice(v, i: int, dim_sz: int) -> slice:
             if isinstance(v, slice):
@@ -493,6 +501,9 @@ class Tensor:
             # Slice tensor
             sliced_tensor = reshaped_tensor.slice(tuple(helpers.flatten(((0, sh), (0, 1)) for sh in new_shape)))
             return sliced_tensor
+
+        # Convert keys to list
+        orig_slices = list(keys) if isinstance(keys, tuple) else [keys]
 
         # Count occurrences of each type in keys
         count = defaultdict(list)
@@ -543,7 +554,30 @@ class Tensor:
                         tensors.append(s)
                         dim.append(i - dim_collapsed)
 
-        return sliced_tensor.reshape(tuple(final_shape))
+        ret = sliced_tensor.reshape(tuple(final_shape))
+
+        if tensors: # Fancy/tensor indexing
+            # normalize idx
+            idx = [t.sign().__neg__().relu() * ret.shape[d] + t for d,t in zip(dim, tensors)]
+            max_dim = max(i.ndim for i in idx)
+            # compute sum_dim, arange, and idx
+            sum_dim = [d if n==0 else d+max_dim-n for n,d in enumerate(dim)]
+            arange = [Tensor.arange(ret.shape[d], dtype=Tensor.Dtype.Int, requires_grad=False).reshape(*[1]*sd, ret.shape[d], *[1]*(ret.ndim + max_dim - n - sd - 1)) for n,(sd,d) in enumerate(zip(sum_dim, dim))]
+            first_idx = [idx[0].reshape(*[1]*dim[0], *[1]*(1 + max_dim - idx[0].ndim), *idx[0].shape, *[1]*(ret.ndim - dim[0] - 1))]
+            rest_idx = [i.reshape(*[1]*dim[0], *[1]*(max_dim - i.ndim), *i.shape, *[1]*(ret.ndim - dim[0] - n)) for n,i in enumerate(idx[1:], 1)]
+            idx = first_idx + rest_idx
+            ret = ret.reshape(*ret.shape[:sum_dim[0]+1], *[1]*max_dim, *ret.shape[sum_dim[0]+1:])
+
+            # iteratively fancy index
+            for a,i,sd in zip(arange, idx, sum_dim): 
+                ret = (a==i).mul(ret).sum(sd)
+                
+            # special permute case
+            if dim[0] != 0 and len(dim) != 1 and dim != list(range(dim[0], dim[-1]+1)):
+                ret_dims = list(range(ret.ndim))
+                ret = ret.permute(ret_dims[dim[0]:dim[0]+max_dim] + ret_dims[:dim[0]] + ret_dims[dim[0]+max_dim:])
+
+        return ret
 
     #* Binary operator magic methods
 
@@ -638,15 +672,15 @@ class Tensor:
         return self.assign(self.pow(other))
 
     def __matmul__(self, other) -> Tensor:
-        if DEBUG:
-            assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
-        
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
+
         return self.matmul(other)
     
     def __imatmul__(self, other) -> Tensor: 
-        if DEBUG:
-            assert isinstance(other, Tensor), f"Cannot perform Tensor multiplication with type {type(other)}"
-        
+        if not isinstance(other, Tensor): 
+            other = Tensor(other)
+
         return self.assign(self.matmul(other))
 
     def __eq__(self, other) -> Tensor:
@@ -655,7 +689,7 @@ class Tensor:
             
         x, y = self._broadcasted(other)
             
-        return Tensor(x._data == y._data)
+        return Tensor(x._storage == y._storage)
     
     def __ne__(self, other) -> Tensor:
         if not isinstance(other, Tensor):
@@ -663,7 +697,7 @@ class Tensor:
             
         x, y = self._broadcasted(other)
             
-        return Tensor(x._data != y._data)
+        return Tensor(x._storage != y._storage)
         
     def __lt__(self, other) -> Tensor: 
         if not isinstance(other, Tensor):
@@ -671,7 +705,7 @@ class Tensor:
             
         x, y = self._broadcasted(other)
             
-        return Tensor(x._data < y._data)
+        return Tensor(x._storage < y._storage)
     
     def __gt__(self, other) -> Tensor: 
         if not isinstance(other, Tensor):
@@ -679,7 +713,7 @@ class Tensor:
             
         x, y = self._broadcasted(other)
             
-        return Tensor(x._data > y._data)
+        return Tensor(x._storage > y._storage)
     
     def __le__(self, other) -> Tensor: 
         if not isinstance(other, Tensor):
@@ -687,7 +721,7 @@ class Tensor:
             
         x, y = self._broadcasted(other)
             
-        return Tensor(x._data <= y._data)
+        return Tensor(x._storage <= y._storage)
 
     def __ge__(self, other) -> Tensor: 
         if not isinstance(other, Tensor):
@@ -695,7 +729,7 @@ class Tensor:
             
         x, y = self._broadcasted(other)
             
-        return Tensor(x._data >= y._data)
+        return Tensor(x._storage >= y._storage)
 
     def __hash__(self) -> int:
         return id(self)
@@ -720,7 +754,7 @@ class Tensor:
         assert self.shape == x.shape, f"Assign shape mismatch {self.shape} != {x.shape}."
         # assert not x.requires_grad
 
-        self._data = x._data
+        self._storage = x._storage
         # TODO: Mirko, 04.05.2024.
         # Temporary hack since it's sometimes necessary to create a
         # copy of a Tensor (including the ._ctx and grad fields) in
@@ -739,25 +773,25 @@ class Tensor:
     # to use data from the Tensors without adding those operations
     # to the graph.
     def detach(self) -> Tensor: 
-        return Tensor(self._data)
+        return Tensor(self._storage)
 
     #* Utility
     
     def eq(self, other: Tensor) -> bool:
-        return self._data.eq(other._data)
+        return self._storage.eq(other._storage)
     
     def is_scalar(self) -> bool:
-        return self._data.is_scalar()
+        return self._storage.is_scalar()
     
     def is_square(self) -> bool:
         assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
-        return self._data.is_square()
+        return self._storage.is_square()
     
     def item(self) -> float:
         assert self.is_scalar(), f"a Tensor with {len(self._np)} elements cannot be converted to Scalar."
         return self._np.item()
 
-    def numel(self) -> int:
+    def num_el(self) -> int:
         return len(self._np)
 
     def __repr__(self) -> str:
