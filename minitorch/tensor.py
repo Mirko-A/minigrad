@@ -126,15 +126,15 @@ class Tensor:
         tri_mask = (Tensor.arange(row, dtype=dtype, requires_grad=requires_grad).unsqueeze(1).expand((row,col)) > Tensor.arange(-offset, col-offset, dtype=dtype, requires_grad=requires_grad).unsqueeze(0).expand((row,col)))
         return tri_mask.where(Tensor(1), Tensor(0))
     
-    def triu(self, k: int=0) -> Tensor:
-        assert helpers.all_int(self.shape), f"does not support symbolic shape {self.shape}"
-
-        return Tensor._tri(self.shape[-2], self.shape[-1], offset=k, dtype=self.dtype).where(self, Tensor.full_like(self, 0.0))
-
     def tril(self, k: int=0) -> Tensor:
         assert helpers.all_int(self.shape), f"does not support symbolic shape {self.shape}"
 
-        return Tensor._tri(self.shape[-2], self.shape[-1], offset=k+1, dtype=self.dtype).where(Tensor.full_like(self, 0.0), self)
+        return Tensor._tri(self.shape[-2], self.shape[-1], offset=k+1, dtype=self.dtype).where(self, Tensor.full_like(self, 0.0))
+
+    def triu(self, k: int=0) -> Tensor:
+        assert helpers.all_int(self.shape), f"does not support symbolic shape {self.shape}"
+
+        return Tensor._tri(self.shape[-2], self.shape[-1], offset=k, dtype=self.dtype).where(Tensor.full_like(self, 0.0), self)
 
     def cat(self, others: list[Tensor], axis: int = 0) -> Tensor:
         axis = (axis + len(self.shape)) if axis < 0 else axis
