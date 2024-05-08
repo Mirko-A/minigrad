@@ -214,7 +214,7 @@ class AttentionHead(Module):
         k = self.key(input)
 
         w = q @ k.transpose() * k.shape[-1]**-0.5
-        w = Tensor.masked_fill(w, self.tril[:T, :T] == 0, float('-inf'))
+        w = w.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
         
         w = w.softmax()
         
