@@ -66,6 +66,10 @@ class Storage:
     def shape(self):
         return self._np.shape
     
+    @property
+    def size(self):
+        return self._np.size
+    
     #* Storage generation functions 
     
     @staticmethod
@@ -172,7 +176,7 @@ class Storage:
     def all_close(self, other: Storage, equal_nan: bool = False) -> bool:
         return np.allclose(self._np, other._np, equal_nan=equal_nan)
 
-    def is_close(self, other: Storage, equal_nan: bool = False) -> bool:
+    def is_close(self, other: Storage, equal_nan: bool = False) -> Storage:
         return Storage(np.isclose(self._np, other._np, equal_nan=equal_nan))
     
     def is_scalar(self) -> bool:
@@ -180,3 +184,6 @@ class Storage:
     
     def is_square(self) -> bool:
         return self.shape[-1] == self.shape[-2]
+    
+    def item(self) -> Value:
+        return self._np.item()

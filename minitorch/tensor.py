@@ -63,6 +63,10 @@ class Tensor:
         return self._storage.shape
 
     @property
+    def size(self):
+        return self._storage.size
+
+    @property
     def ndim(self):
         return len(self.shape)
 
@@ -105,13 +109,13 @@ class Tensor:
 
     @staticmethod
     def randn(shape: tuple[int, ...], mean: float = 0.0, std_dev: float = 1.0, dtype: Optional[Dtype] = None, requires_grad: bool = False) -> Tensor:
-        data = np.reshape(np.array([gauss(mean, std_dev) for _ in range(math.prod(shape))], dtype=dtype), shape)
-        return Tensor(data, requires_grad=requires_grad)
+        data = np.reshape(np.array([gauss(mean, std_dev) for _ in range(math.prod(shape))]), shape)
+        return Tensor(data, dtype=dtype, requires_grad=requires_grad)
 
     @staticmethod
     def uniform(shape: tuple[int, ...], low: float, high: float, dtype: Optional[Dtype] = None, requires_grad: bool = False) -> Tensor:
-        data = np.reshape(np.array([uniform(low, high) for _ in range(math.prod(shape))], dtype=dtype), shape)
-        return Tensor(data, requires_grad=requires_grad)
+        data = np.reshape(np.array([uniform(low, high) for _ in range(math.prod(shape))]), shape)
+        return Tensor(data, dtype=dtype, requires_grad=requires_grad)
 
     def masked_fill(self, mask: Tensor, value: Value) -> Tensor:
         old, new = self, Tensor(value)
@@ -780,19 +784,25 @@ class Tensor:
     def eq(self, other: Tensor) -> bool:
         return self._storage.eq(other._storage)
     
+    def all_close(self, other: Tensor, equal_nan: bool = False) -> bool:
+        return self._storage.all_close(other._storage, equal_nan=equal_nan)
+
+    def is_close(self, other: Tensor, equal_nan: bool = False) -> Tensor:
+        return Tensor(self._storage.is_close(other._storage, equal_nan=equal_nan), dtype=Tensor.Dtype.Bool)
+    
     def is_scalar(self) -> bool:
-        return self._storage.is_scalar()
+        return self.size == 1
     
     def is_square(self) -> bool:
         assert len(self.shape) >= 2, f"Cannot check for squareness on a {len(self.shape)}D Tensor. Expected 2D or higher."
         return self._storage.is_square()
     
-    def item(self) -> float:
-        assert self.is_scalar(), f"a Tensor with {len(self._np)} elements cannot be converted to Scalar."
-        return self._np.item()
+    def item(self) -> Value:
+        assert self.is_scalar(), f"a Tensor with {len(self.size)} elements cannot be converted to Scalar."
+        return self._storage.item()
 
     def num_el(self) -> int:
-        return len(self._np)
+        return self.size
 
     def __repr__(self) -> str:
         return f"<Tensor: \n{self._np} with grad {self.grad._np if self.grad else None}>"
