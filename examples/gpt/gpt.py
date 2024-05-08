@@ -7,7 +7,6 @@ from minitorch.nn.optim import Adam
 
 import time
 import sys
-sys.setrecursionlimit(1500)
 
 with open('./examples/gpt/the_sopranos_pilot.txt', 'r', encoding='utf-8') as f:
     text = f.read()
@@ -30,20 +29,20 @@ def get_batch(split: str = 'train', batch_size: int = 64, max_context_len: int =
     # data = train_data if split == 'train' else val_data
     data_len = n if split == 'train' else text_len - n
     ix = [randint(0, data_len - max_context_len) for _ in range(batch_size)]
-    x = Tensor.stack([Tensor([encoded_text[i:i+max_context_len]]).squeeze() for i in ix])
-    y = Tensor.stack([Tensor.stack([Tensor.one_hot(vocab_size, j).reshape(1, vocab_size)\
-        for j in encoded_text[i+1:i+max_context_len+1]]) for i in ix]).reshape([batch_size, max_context_len, vocab_size])
+    x = Tensor.stack([Tensor(encoded_text[i:i+max_context_len]) for i in ix])
+    y = [encoded_text[i+1:i+max_context_len+1] for i in ix]
+    y_one_hot = Tensor.stack([Tensor.one_hot(vocab_size, yii) for yi in y for yii in yi])
     # print(f'X: {x.shape}')
     # print(f'Y: {y}')  
     
-    return x, y
+    return x, y_one_hot
 
 def estimate_loss():
     out = {}
     model.eval()
     for split in ['train', 'val']:
         losses = []
-        X, Y = get_batch(split, 16, 32)
+        X, Y = get_batch(split, 16, 64)
         for iter in range(eval_iters):
             print(f'    Eval iteration ({split}): {iter}')
             _, loss = model(X, Y)
@@ -112,7 +111,7 @@ class GPT(Module):
         # This is deviates from the original paper.
         self.ln_f = LayerNorm(config.embedding_dim)
         self.lm_head = Linear(config.embedding_dim, config.vocab_size)
-        self.loss = CrossEntropyLoss()
+        self.loss = CrossEntropyLoss(axis=-1)
         
     def forward(self, idx: Tensor, targets: Tensor = None):
         B, T = idx.shape
@@ -129,9 +128,9 @@ class GPT(Module):
         else:
             B, T, C = logits.shape
             logits = logits.reshape(B*T, C)
-            targets = targets.reshape(B*T, C)
+            # targets = targets.reshape(B*T, C) Targets already reshaped in get_batch
             softmax = logits.softmax()
-            l = self.loss(softmax, targets)
+            l = self.loss(softmax, targets).mean()
 
         return logits, l
     
@@ -159,7 +158,7 @@ class GPT(Module):
     def __call__(self, idx: Tensor, targets: Tensor = None):
         return self.forward(idx, targets)
     
-config = GPTConfig(max_context_len=32, vocab_size=vocab_size, n_layer=4, n_head=4, embedding_dim=32)
+config = GPTConfig(max_context_len=64, vocab_size=vocab_size, n_layer=4, n_head=8, embedding_dim=64)
 model = GPT(config)
 adam = Adam(model.params(), 1e-4)
 max_iters = 50
@@ -175,7 +174,7 @@ for iter in range(1, max_iters + 1):
         losses = estimate_loss()
         print(f"step {iter}: train loss {losses['train']}, val loss {losses['val']}")
     
-    xb, yb = get_batch(batch_size=16, max_context_len=32)
+    xb, yb = get_batch(batch_size=16, max_context_len=64)
     logits, loss = model(xb, yb)
     adam.zero_grad()
     loss.backward()
